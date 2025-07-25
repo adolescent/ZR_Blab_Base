@@ -13,15 +13,16 @@ matrix_size = 400
 image_matrix = np.zeros((matrix_size, matrix_size), dtype=np.uint8)
 
 # Grid size and bar length
-grid_size = 25
-bar_length = 10  # Fixed length for all bars
+grid_size = 20
+bar_length = 9  # Fixed length for all bars
 
 # Define possible angles (0, 22.5, ..., 337.5 degrees)
-angles = [i * 20 for i in range(18)]
+angles = [i * 10 for i in range(36)]
+# angles = [25+90]
 
 # Draw random bars in each segment
-for i in range(16):
-    for j in range(16):
+for i in range(matrix_size//grid_size):
+    for j in range(matrix_size//grid_size):
         # Calculate the center of the segment
         center_x = (i * grid_size) + (grid_size // 2)
         center_y = (j * grid_size) + (grid_size // 2)
@@ -40,4 +41,4 @@ for i in range(16):
         cv2.line(image_matrix, (start_x, start_y), (end_x, end_y), 255, 2)
 
 # Now image_matrix is a 400x400 uint8 matrix with white bars on a black background
-plt.imshow(image_matrix)
+plt.imshow(image_matrix,cmap='gray')
