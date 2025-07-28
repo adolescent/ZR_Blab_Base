@@ -156,11 +156,11 @@ def ML_Struck_Unpack(data_bytes,var_dim):
     for i in range(struct_len):
         struct_dict[i]={} # generate sub-field data type for reading.
         for j in range(N_field):
-            print(len(rest_bytes))
+            # print(len(rest_bytes))
             rest_bytes,field_name,field_type,field_dim = ML_Meta(rest_bytes)
             # print(field_name)
             # print(field_dim)
-            print(field_type)
+            # print(field_type)
             if field_type == 'char':
                 rest_bytes,field_var = ML_Char_Unpack(rest_bytes,field_dim)
             elif field_type == 'double':
@@ -199,7 +199,7 @@ if __name__ == '__main__':
 #%% bug testing
     test_bytes = data_bytes[-11627284:]
     decoder = 'utf-8'
-    rest_bytes,var_name,var_type,var_dim = ML_Meta(test_bytes) 
+    rest_bytes,var_name,var_type,var_dim = ML_Meta(test_bytes)
 
     # rest_bytes,var_name,var_type,var_dim = ML_Meta(test_bytes) 
     buggy_start = copy.deepcopy(rest_bytes)
