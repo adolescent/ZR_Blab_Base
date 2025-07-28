@@ -1,6 +1,6 @@
 
 import os
-
+import struct
 
 
 def Get_File_Name(path,file_type = '.jpg',keyword = ''):
@@ -30,3 +30,13 @@ def Get_File_Name(path,file_type = '.jpg',keyword = ''):
                     Name_Lists.append(os.path.join(root, file))
 
     return Name_Lists
+
+def Bin_Unpack(bytes,unpack_bit_num,var_len,type):
+    '''
+    Unpack a specific length of bits, return cutted bits
+    '''
+    buffer = str(var_len)+type
+    unpacked = struct.unpack(buffer,bytes[:unpack_bit_num])
+    rest_bytes = bytes[unpack_bit_num:]
+
+    return rest_bytes,unpacked
