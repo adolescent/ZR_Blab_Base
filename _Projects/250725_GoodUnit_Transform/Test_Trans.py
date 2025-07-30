@@ -21,17 +21,28 @@ savepath= r'D:\#Data\silct\Trans_Response'
 filename = gn_path.split('\\')[-1][:-4] # get whole name of current spike file.
 
 
-data_dict = mat73.loadmat(gn_path)
-# data_dict = ot.Load_Variable(savepath,filename+'.raw')
-ot.Save_Variable(savepath,filename,data_dict,'.raw')
+# data_dict = mat73.loadmat(gn_path)
+data_dict = ot.Load_Variable(savepath,filename+'.raw')
+# ot.Save_Variable(savepath,filename,data_dict,'.raw')
 
 # raw_data = data_dict['GoodUnitStrc']['response_matrix_img']
 trail_info = data_dict['meta_data']['trial_valid_idx']  # all trails, remove 0 will return trains
 raster_info = data_dict['GoodUnitStrc']['Raster']  # raster of all trails, average to get response matrix.
-# pivot raster map into 
+# calculate PSTH matrix.
+cellnum = len(raster_info)
+img_num = 1416 # given by 
+time_points = (raster_info[0]).shape[1]
+PSTH = np.zeros(shape = (cellnum,img_num,time_points),dtype='f8') # use average(not sum) for psth calculation.
+for i in tqdm(range(cellnum)):
+    cc_response = Spike_Arrange(raster_info[i],trail_info,img_num)
+    PSTH[i,:,:] = cc_response.mean(0)
+ot.Save_Variable(savepath,f'{filename}_PSTH',PSTH,'.psth')
+#%% After calculation, comparing onset and base for response significance.
+# use welch ttest for response strength calculation?
+base = np.arange(75,125) # corresponding to -25-25ms
+onset = np.arange(150,350) # corresponding to 50-250ms
 
-# cellnum = len(raw_data)
-# img_num,time_points = raw_data[0].shape
+
 
 #%% transform raw into python-readable style
 raw_graphs = np.zeros(shape = (cellnum,img_num,time_points),dtype='f8')
