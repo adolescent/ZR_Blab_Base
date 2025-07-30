@@ -39,3 +39,24 @@ def Spike_Arrange(raster_plot,trail_ids,condition_num = 1416,keep_all = False):
     return arranged_spikes
 
 
+def D_Prime(disp_A,disp_B):
+    '''
+    Calculate d prime of 2 distributions. very widely used.
+    '''
+    mu_n = np.mean(disp_A)
+    mu_s = np.mean(disp_B)
+    var_n = np.var(disp_A, ddof=1)  # ddof=1 用于样本方差
+    var_s = np.var(disp_B, ddof=1)
+
+    # 计算合并标准差
+    n_n = len(disp_A)
+    n_s = len(disp_B)
+    pooled_var = ((n_n - 1) * var_n + (n_s - 1) * var_s) / (n_n + n_s - 2)
+    pooled_std = np.sqrt(pooled_var)
+
+    # 计算 d prime
+    d_prime = (mu_s - mu_n) / pooled_std
+
+    return d_prime
+
+
