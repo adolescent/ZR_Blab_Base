@@ -15,6 +15,7 @@ from scipy import stats
 import OS_Tools as ot
 import pandas as pd
 from Spike_Tools import *
+import random
 from Matrix_Tools import *
 import cv2
 
@@ -277,7 +278,105 @@ fig.tight_layout()
 
 #%% ############################## PCA Analysis ##################
 '''
-Use all neurons as 
+Use all neurons as feature, getting coordinate of imgs in pc space.
 '''
+comps,coords,model = Do_PCA(filled_resp,'Cell',20)
+
+# then we try to calculate id of texture graphs on pc axis
+coords = pd.DataFrame(coords)
+# plt.bar(height=model.explained_variance_ratio_,x = range(1,21))
+
+fig,ax = plt.subplots(ncols=1,nrows=1,figsize = (6,6),dpi=240)
+# plt.hist(model.explained_variance_ratio_)
+sns.scatterplot(data = coords,x = 0,y=1,lw=0,s=6,ax = ax)
+ax.set_ylabel('PC 2')
+ax.set_xlabel('PC 1')
 
 
+#%% get best and worst 
+a = coords.sort_values(by=[4],ascending=False)
+pc_biggest_sim = np.array(a.iloc[:36].index)
+pc_smallest_sim = np.array(a.iloc[-36:].index)
+
+fig,ax = plt.subplots(ncols=6,nrows=6,figsize = (12,12),dpi=180)
+for i in range(36):
+    # c_graph_id = pc_biggest_sim[i] # x3+1 is the first texture graph.
+    c_graph_id = pc_smallest_sim[i] 
+    c_texture = str(10000+c_graph_id*3+3)[1:]+'.jpg'
+    c_texture_graph = cv2.imread(ot.Join(figpath,c_texture),0)
+    ax[i//6,i%6].imshow(c_texture_graph,cmap='gray')
+    ax[i//6,i%6].set_yticks([])
+    ax[i//6,i%6].set_xticks([])
+
+fig.tight_layout()
+
+#%% ############### Clustering #####################
+'''
+Use hierachical cluster based on top 50 PC, getting prefered cluster of stims.
+'''
+# getting preference on specific clusters,
+comps,coords,model = Do_PCA(filled_resp,'Cell',50)
+from scipy.spatial.distance import pdist,squareform
+
+distance_metric = 'euclidean'
+distance_matrix = pdist(coords , metric=distance_metric)
+square_matrix = squareform(distance_matrix) 
+sns.heatmap(square_matrix)
+#%% plot hierachical linkage map.
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+Z = linkage(distance_matrix, method='ward',metric=distance_metric )
+
+
+fig,ax = plt.subplots(ncols=1,nrows=1,figsize = (4,6),dpi = 180)
+a = dendrogram(
+    Z,
+    truncate_mode='lastp',  # Show only the last p merged clusters
+    p=25000,                   #Steps of cluster to show. set very big will show whole dentrogram.
+    show_leaf_counts=True,
+    leaf_rotation=90, # rotation angle of leaf 
+    leaf_font_size=6, # fontsize of leaf
+    ax = ax,
+    orientation= 'top' # Orientation of cluster going on. top as default.
+)
+ax.set_title('Dendrogram')
+ax.set_xlabel('Samples')
+ax.set_ylabel('Distance')
+ax.set_xticks([])
+
+# clust_dist = 45
+n_clust = 8
+clusters = fcluster(Z, t = n_clust, criterion='maxclust')
+print(set(clusters)) # cluster is a list of id, indicating the cluster of each pix.
+
+#%% 
+clust_ids = list(np.where(clusters==1)[0])
+print(len(clust_ids))
+n_rand = random.sample(clust_ids,k=min(36,len(clust_ids)))
+
+
+fig,ax = plt.subplots(ncols=6,nrows=6,figsize = (12,12),dpi=180)
+
+for i in range(36):
+    ax[i//6,i%6].set_yticks([])
+    ax[i//6,i%6].set_xticks([])
+
+for i in range(36):
+    # c_graph_id = pc_biggest_sim[i] # x3+1 is the first texture graph.
+    # c_graph_id = pc_smallest_sim[i] 
+    if i >= len(clust_ids):
+        break
+    c_texture = str(10000+n_rand[i]*3+3)[1:]+'.jpg'
+    c_texture_graph = cv2.imread(ot.Join(figpath,c_texture),0)
+    ax[i//6,i%6].imshow(c_texture_graph,cmap='gray')
+
+fig.tight_layout()
+
+#%%  ###################### CCA Analysis
+from sklearn.cross_decomposition import CCA
+
+cca = CCA(n_components=2)
+cca.fit(filled_resp.T, text_resp.T)
+X_train_r, Y_train_r = cca.transform(filled_resp.T, text_resp.T)
+# X_test_r, Y_test_r = cca.transform(X_test, Y_test)
+# plt.scatter(X_train_r[:,0],X_train_r[:,1],s=2)
+plt.scatter(X_train_r[:,1],Y_train_r[:,1],s=2)

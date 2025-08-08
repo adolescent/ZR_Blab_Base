@@ -1,5 +1,5 @@
 clear
-root_dir = 'E:\ZR_Temp\Process_pipeline_2025April';
+root_dir = 'D:\#Codes\ZR_Blab_Base\Process_pipeline_2025April';
 cd(root_dir)
 addpath(genpath('C:\Users\admin\AppData\Roaming\MathWorks\MATLAB Add-Ons\Apps\NIMHMonkeyLogic22'))
 addpath(genpath(root_dir))
@@ -14,7 +14,7 @@ addpath(genpath(root_dir))
 %         interested_path{end+1}=ses_dir;
 %     end
 % end
-interested_path{1}='E:\ZR_Temp\_Data_Temp\JJ_250411_silct_MSB_mismatch';
+interested_path{1}='D:\#Data\Loc_Example\Example_Data_FOB';
 % interested_path{2}='E:\MKB_project\MKB\JJ_MKI_0328';
 % interested_path{3}='E:\MKB_project\MKB\ZZ_MKI_0328';
 % interested_path{1}='E:\MKB_project\MKB\250325_ZZ';

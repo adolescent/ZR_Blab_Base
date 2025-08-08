@@ -16,20 +16,23 @@ import cv2
 import random
 
 
-# image = io.imread(r'D:\#Data\#stimuli\silct\silct_npx_1416\0011.jpg')
-image = io.imread(r'D:\#Data\#stimuli\FOB96\FOB2023short\033.png')
-gray_image = color.rgb2gray(image)*255
-blurred = cv2.GaussianBlur(gray_image, (11,11),5)
-boulders = Boulder_Canny((blurred).astype('u1'),20,25)
-plt.imshow(boulders)
-image = boulders
+image = io.imread(r'D:\#Data\#stimuli\silct\silct_npx_1416\0251.jpg')
+# image = io.imread(r'D:\#Data\#stimuli\FOB96\FOB2023short\033.png')
+# gray_image = (color.rgb2gray(image)*255).astype('u1')
+# blurred = cv2.GaussianBlur(gray_image, (11,11),5)
+# boulders = Boulder_Canny((blurred).astype('u1'),20,25)
+# plt.imshow(boulders)
+# image = boulders
+## smooth image, to avoid complex local patterns.
+# img = cv2.imread(r'D:\#Data\#stimuli\silct\silct_npx_1416\0143.jpg',0)
+
 
 
 grid_size = 20 # size of grid for img cutting. This will cut grids into several small pieces.
-bar_length = 8 # size of plotted bar, must smaller than half grid.
+bar_length = 9 # size of plotted bar, must smaller than half grid.
 lw = 2 # width of bar lines.
-ang_tick=1
-img_min_pix = 15 # at least 5 pix below value 
+ang_tick= 5
+img_min_pix = 10 # at least 5 pix below value 
 on_thres = 0.5 # used for 
 bk_phase_rand = True
 
@@ -38,6 +41,10 @@ if len(image.shape) == 3:
     gray_image = color.rgb2gray(image)
 else:
     gray_image = image
+
+_,gray_image = cv2.threshold(gray_image,0.5,1, cv2.THRESH_BINARY_INV)
+gray_image = 1-gray_image
+# gray_image = gray_image/255
 height,width = gray_image.shape
 height_win = height//grid_size
 width_win = width//grid_size
@@ -82,9 +89,11 @@ for i in range(height_win):
         grid_infos.loc[counter] = [j,i,c_orien,c_orien_ticks,pix_num,x_adj,y_adj]
         counter += 1
 
+# grid_infos = grid_infos.fillna(-1)
 
 #%% #################### STEP2,boulder gragh generation #################
 bar_matrix = np.zeros((height,width), dtype=np.uint8)
+# rand_fill = True
 rand_fill = False
 
 
