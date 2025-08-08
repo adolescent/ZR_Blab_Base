@@ -28,38 +28,49 @@ def MUA_Detector(wp,npx_path,thres = 1.5):
     # npx_path = npx_path[0]
     # tsv_path = os.path.join(wp,'WordLocalizer_info.tsv')
     # bhv_path =os.path.join(wp,'241026_MaoDan_YJ_WordLOC.bhv2')
+    # # if raw exist, just load it in.
+    bin_path = []
+    for root, dirs, files in os.walk(wp):
+        if root == wp:
+            for dir_name in dirs:
+                if 'Bin_File' in dir_name:
+                    bin_path.append(os.path.join(root, dir_name))
+    if bin_path != []:
+        print('Bin format already saved.')
+        rec3 = si.load(bin_path[0])
+    else:
+        print('Preprocessing Data, might be a little slow.')
+        # get raw data and 
+        stream_names, stream_ids = si.get_neo_streams('spikeglx',npx_path)
+        print(stream_names)
+        raw_rec = si.read_spikeglx(npx_path, stream_name='imec0.ap', load_sync_channel=False)
+        raw_rec.get_probe().to_dataframe()
+        # eazy process
+
+        # remove bad channel id
+        rec3=raw_rec
+        # bad_channel_ids, channel_labels = si.detect_bad_channels(raw_rec)
+        # rec3 = raw_rec.remove_channels(bad_channel_ids)
+        # print('Preprocess Real Data, bad_channel_ids', bad_channel_ids)
+
+        ## high pass filter
+        print('Preprocess Real Data, High Pass')
+        rec3 = si.highpass_filter(recording=rec3, freq_min=300.)
+        # rec3 = si.bandpass_filter(recording=rec3,freq_min=300)
 
 
-    # get raw data and 
-    stream_names, stream_ids = si.get_neo_streams('spikeglx',npx_path)
-    print(stream_names)
-    raw_rec = si.read_spikeglx(npx_path, stream_name='imec0.ap', load_sync_channel=False)
-    raw_rec.get_probe().to_dataframe()
-    # eazy process
+        ## pahse shift
+        # print('Preprocess Real Data, phase shift')
+        # rec3 = si.phase_shift(rec3)
 
-    ## remove bad channel id
-    bad_channel_ids, channel_labels = si.detect_bad_channels(raw_rec)
-    rec3 = raw_rec.remove_channels(bad_channel_ids)
-    print('Preprocess Real Data, bad_channel_ids', bad_channel_ids)
-
-    ## high pass filter
-    print('Preprocess Real Data, High Pass')
-    rec3 = si.highpass_filter(recording=rec3, freq_min=300.)
-    # rec3 = si.bandpass_filter(recording=rec3,freq_min=300)
-
-
-    ## pahse shift
-    print('Preprocess Real Data, phase shift')
-    rec3 = si.phase_shift(rec3)
-
-    ## common reference
-    print('Preprocess Real Data, CAR')
-    rec3 = si.common_reference(rec3, operator="median", reference="global")
-    # rec = rec3
-    #% save pre-processed data.
-    # # rasters = traces0>(traces0.std()*mua_thres)
-    job_kwargs = dict(chunk_duration='0.5s', progress_bar=True,overwrite=True)
-    rec3 = rec3.save(folder=os.path.join(wp,'Bin_File'), format='binary',**job_kwargs)
+        ## common reference
+        print('Preprocess Real Data, CAR')
+        rec3 = si.common_reference(rec3, operator="median", reference="global")
+        # rec = rec3
+        #% save pre-processed data.
+        # # rasters = traces0>(traces0.std()*mua_thres)
+        job_kwargs = dict(chunk_duration='1s', progress_bar=True,overwrite=True)
+        rec3 = rec3.save(folder=os.path.join(wp,'Bin_File'), format='binary',**job_kwargs)
 
     # try build-in threshold detector.
 

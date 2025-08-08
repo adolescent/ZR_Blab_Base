@@ -18,11 +18,12 @@ npx_path = r'D:\#Data\Loc_Example\npx_root_decoy\NPX_MD241029_exp_g0'
 
 ov = Online_Viewer(wp,npx_path)
 ov.Process()
-ov.Plot_All()
+# ov.Plot_Global()
 
 #%% d prime graphs 
 print(ov.clusts)
-A_set = [3]
-B_set = [1,2,4,5,6]
+A_set = [6]
+B_set = [1,2,3,4,5]
 cc_resp = ov.Subtract(A_set,B_set,plot=True)
-
+#%% plot sorted cell by subtraction response.
+ov.Plot_Sorted_Global(cc_resp)
