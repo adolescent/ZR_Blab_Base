@@ -16,7 +16,7 @@ import cv2
 import random
 
 
-image = io.imread(r'D:\#Data\#stimuli\silct\silct_npx_1416\0251.jpg')
+image = io.imread(r'D:\#Data\#stimuli\silct\silct_npx_1416\0023.jpg')
 # image = io.imread(r'D:\#Data\#stimuli\FOB96\FOB2023short\033.png')
 # gray_image = (color.rgb2gray(image)*255).astype('u1')
 # blurred = cv2.GaussianBlur(gray_image, (11,11),5)

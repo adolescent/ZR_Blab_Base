@@ -22,8 +22,8 @@ ov.Process()
 
 #%% d prime graphs 
 print(ov.clusts)
-A_set = [6]
-B_set = [1,2,3,4,5]
+A_set = [2]
+B_set = [1,3,4,5,6]
 cc_resp = ov.Subtract(A_set,B_set,plot=True)
 #%% plot sorted cell by subtraction response.
 ov.Plot_Sorted_Global(cc_resp)

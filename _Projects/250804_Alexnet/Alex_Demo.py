@@ -38,8 +38,8 @@ with open('imagenet_class_index.json', 'r', encoding='utf-8') as file:
 from PIL import Image,ImageOps
 from torchvision import transforms
 # input_image = Image.open(filename)
-# input_image = Image.open('dog4.jpg')
-input_image = Image.open(r'D:\#Data\#stimuli\silct\silct_npx_1416\1400.jpg').convert('L').convert('RGB')
+input_image = Image.open('dog3.jpg')
+# input_image = Image.open(r'D:\#Data\#stimuli\silct\silct_npx_1416\1400.jpg').convert('L').convert('RGB')
 # input_image = Image.open(r'D:\#Data\#stimuli\silct\silct_npx_1416\1257.jpg')
 # input_image = ImageOps.invert(input_image)
 preprocess = transforms.Compose([
@@ -97,7 +97,7 @@ for i in range(len(top5_catid)):
 fig,ax = plt.subplots(ncols=6,nrows=6,dpi = 300,figsize = (7,7))
 
 for i in range(36):
-    c_response = activations['conv5'].cpu().numpy()[0,i+72,:,:]
+    c_response = activations['conv1'].cpu().numpy()[0,i,:,:]
     sns.heatmap(c_response,center = 0,xticklabels=False,yticklabels=False,cbar=False,ax = ax[i//6,i%6])
     
 fig.tight_layout()

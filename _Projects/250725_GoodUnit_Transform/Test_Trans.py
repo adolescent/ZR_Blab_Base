@@ -19,15 +19,20 @@ import random
 from Matrix_Tools import *
 import cv2
 
-gn_path = r'D:\#Data\silct\GoodUnit_250411_JianJian_silct_npx_1416_g0_MSB.mat'
+data_path = r'D:\#Data\silct'
+all_gn_names = ot.Get_File_Name(data_path,'.mat')
+# gn_path = r'D:\#Data\silct\GoodUnit_250325_ZhuangZhuang_silct_npx_1416_g4_ASB.mat'
+gn_path = all_gn_names[4]
 savepath= r'D:\#Data\silct\Trans_Response'
 filename = gn_path.split('\\')[-1][:-4] # get whole name of current spike file.
 
+#%%
+data_dict = mat73.loadmat(gn_path)
+# data_dict = ot.Load_Variable(savepath,filename+'.raw')
 
-# data_dict = mat73.loadmat(gn_path)
-data_dict = ot.Load_Variable(savepath,filename+'.raw')
-# ot.Save_Variable(savepath,filename,data_dict,'.raw')
-
+print('Loading Done. Saving var to disk...')
+ot.Save_Variable(savepath,filename,data_dict,'.raw')
+#%%
 # raw_data = data_dict['GoodUnitStrc']['response_matrix_img']
 trail_info = data_dict['meta_data']['trial_valid_idx']  # all trails, remove 0 will return trains
 raster_info = data_dict['GoodUnitStrc']['Raster']  # raster of all trails, average to get response matrix.
@@ -35,11 +40,18 @@ raster_info = data_dict['GoodUnitStrc']['Raster']  # raster of all trails, avera
 cellnum = len(raster_info)
 img_num = 1416 # given by 
 time_points = (raster_info[0]).shape[1]
-PSTH = np.zeros(shape = (cellnum,img_num,time_points),dtype='f8') # use average(not sum) for psth calculation.
+cond_num = raster_info[0].shape[0]//img_num
+PSTH = np.zeros(shape = (cellnum,cond_num,img_num,time_points),dtype='u1') # use average(not sum) for psth calculation.
 for i in tqdm(range(cellnum)):
+    if i in [3,7,13,15,16]:
+        continue
     cc_response = Spike_Arrange(raster_info[i],trail_info,img_num)
-    PSTH[i,:,:] = cc_response.mean(0)
-ot.Save_Variable(savepath,f'{filename}_PSTH',PSTH,'.psth')
+    PSTH[i,:,:,:] = cc_response
+# ot.Save_Variable(savepath,f'{filename}_PSTH',PSTH,'.psth')
+print('Saving')
+np.save(ot.Join(savepath,f'{filename}_Rasters'),PSTH)
+# ot.Save_Variable(savepath,f'{filename}_Rasters','.npy')
+
 #%% After calculation, comparing onset and base for response significance.
 # use welch ttest for response strength calculation?
 base = np.arange(75,125) # corresponding to -25-25ms
