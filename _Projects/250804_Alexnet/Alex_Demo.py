@@ -38,9 +38,9 @@ with open('imagenet_class_index.json', 'r', encoding='utf-8') as file:
 from PIL import Image,ImageOps
 from torchvision import transforms
 # input_image = Image.open(filename)
-input_image = Image.open('dog3.jpg')
+# input_image = Image.open('dog3.jpg')
 # input_image = Image.open(r'D:\#Data\#stimuli\silct\silct_npx_1416\1400.jpg').convert('L').convert('RGB')
-# input_image = Image.open(r'D:\#Data\#stimuli\silct\silct_npx_1416\1257.jpg')
+input_image = Image.open(r'D:\#stimuli\Scramble_Global_PNAS_VGG19_50_imgnet\Pool4_C4321_Object_only_Repeat5\0175.jpg')
 # input_image = ImageOps.invert(input_image)
 preprocess = transforms.Compose([
     transforms.Resize(256),

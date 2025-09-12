@@ -106,8 +106,11 @@ if __name__ == '__main__':
     sorted_fc7 = fc7_corr[new_indices, :][:, new_indices] # ignore fob
     
 
-    sns.heatmap(sorted_fc6,center=0,square=True,xticklabels=False,yticklabels=False,cbar=False)
-    sns.heatmap(sorted_fc7,center=0,square=True,xticklabels=False,yticklabels=False,cbar=False)
+    fig,ax = plt.subplots(figsize = (12,6),dpi=300,ncols=2,nrows=1)
+    sns.heatmap(sorted_fc6,center=0,square=True,xticklabels=False,yticklabels=False,cbar=False,ax = ax[0],vmax=0.95,vmin=0)
+    sns.heatmap(sorted_fc7,center=0,square=True,xticklabels=False,yticklabels=False,cbar=False,ax = ax[1],vmax=0.95,vmin=0)
+    fig.tight_layout()
+    np.save('Alexnet_fc6_resps',fc6_resps)
+    np.save('Alexnet_fc7_resps',fc7_resps)
     
 
-    
