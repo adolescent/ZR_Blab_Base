@@ -27,3 +27,5 @@ sns.heatmap(redplot[:,:40],center=0,vmax=1,vmin=-1,ax=ax,cbar=False)
 # ax.invert_yaxis()
 #%%
 plt.plot(redplot[350:,:].mean(0))
+
+
