@@ -1,6 +1,5 @@
 '''
-This script will concat 2 session from ZZ MSB, and sort them by body D prime.
-
+This will try to show ASB 
 '''
 
 #%%
@@ -11,12 +10,10 @@ import numpy as np
 import copy
 
 
-ceiled_files = ot.Get_File_Name(r'D:\_DataTemp\Metamer\ceiled_response\MSB','.pkl')
+ceiled_files = ot.Get_File_Name(r'D:\_DataTemp\Metamer\ceiled_response\ASB','.pkl')
 
 
 #%%
-# concat cells and arrange by body_contra d prime.
-
 for i,c_file in enumerate(ceiled_files):
     c_psth,c_info = ot.Load_Variable(c_file)
     c_body = c_info[c_info['Contra']=='Body_Contra'].reset_index(drop=True)
@@ -24,9 +21,7 @@ for i,c_file in enumerate(ceiled_files):
     if i == 0:
         concated_psth = copy.deepcopy(c_psth[:,72:,:])
         concated_info = copy.deepcopy(c_body)
-    else:
-        concated_psth = np.concatenate((concated_psth,c_psth[:,:1000,:]),axis=0)
-        concated_info = pd.concat([concated_info,c_body])
+
 #%% re-arrange cells with d prime.
 body_dp = np.array(concated_info['D_Prime'])
 
@@ -43,15 +38,16 @@ sorted_psth = concated_psth[sorted_indices]
 
 # calculate redplot of given series.
 redplot = Redplot(sorted_psth)
+
 #%% plot part
 fig,ax = plt.subplots(nrows=1,ncols=2,figsize = (10,8),dpi=240,sharey=True)
 
-sns.heatmap(redplot,center=0,ax = ax[1],vmax = 1,vmin = -1,cbar=False)
+sns.heatmap(redplot,center=0,ax = ax[1],vmax = 0.7,vmin = -0.7,cbar=False)
 ax[0].barh(np.arange(len(body_dp_sorted)),body_dp_sorted)
 ax[0].axvline(x=0.5,linestyle ='--',c='gray')
 ax[1].set_xticks(np.arange(0,1040,40))
 ax[1].set_xticklabels(np.arange(0,1040,40))
 
 #%% save msb response.
-ot.Save_Variable(r'D:\_DataTemp\Metamer\ceiled_response\MSB','Sorted_Response',(body_dp_sorted,redplot,sorted_psth))
+ot.Save_Variable(r'D:\_DataTemp\Metamer\ceiled_response\ASB','Sorted_Response',(body_dp_sorted,redplot,sorted_psth))
 
