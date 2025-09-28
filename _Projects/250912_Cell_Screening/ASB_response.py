@@ -10,7 +10,7 @@ import numpy as np
 import copy
 
 
-ceiled_files = ot.Get_File_Name(r'D:\_DataTemp\Metamer\ceiled_response\ASB','.pkl')
+ceiled_files = ot.Get_File_Name(r'D:\#Data\Metamer\ceiled_response\ASB','.pkl')
 
 
 #%%
@@ -49,5 +49,5 @@ ax[1].set_xticks(np.arange(0,1040,40))
 ax[1].set_xticklabels(np.arange(0,1040,40))
 
 #%% save msb response.
-ot.Save_Variable(r'D:\_DataTemp\Metamer\ceiled_response\ASB','Sorted_Response',(body_dp_sorted,redplot,sorted_psth))
+ot.Save_Variable(r'D:\#Data\Metamer\ceiled_response\ASB','Sorted_Response',(body_dp_sorted,redplot,sorted_psth))
 
