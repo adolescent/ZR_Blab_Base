@@ -12,7 +12,7 @@ from tqdm import tqdm
 import numpy as np
 import copy
 
-wp=r'D:\#Data\Metamer\ceiled_response\ASB'
+wp=r'D:\#Data\Metamer\ceiled_response\MSB'
 
 body_dp_sorted,redplot,sorted_psth = ot.Load_Variable(wp,'Sorted_Response.pkl')
 
@@ -42,10 +42,11 @@ PC_Comps,point_coords,pca = Do_PCA(arranged_redplot,'Cell',1)
 y_ids = np.argsort(PC_Comps[0,:])
 arranged_redplot = arranged_redplot[y_ids,:]
 #%% Plot
-fig,ax = plt.subplots(ncols=1,nrows=1,figsize=(3,5),dpi=240)
+fig,ax = plt.subplots(ncols=1,nrows=1,figsize=(7,5),dpi=240)
 sns.heatmap(arranged_redplot,cmap='bwr',vmax=3,vmin=-3,center=0,cbar=False,ax=ax)
 # ax.set_xticks(np.arange(0,210,10))
 # ax.set_xticklabels(['','Raw','','C4','','C3','','C2','','C1','','Raw','','C4','','C3','','C2','','C1',''],size=6)
 ax.set_xticks(np.arange(0,200,20)+10)
-ax.set_xticklabels(['Raw','C4','C3','C2','C1','Raw','C4','C3','C2','C1'],size=6)
-ax.set_yticks([0,100,200,300])
+# ax.set_xticklabels(['Raw','C4','C3','C2','C1','Raw','C4','C3','C2','C1'],size=6)
+# ax.set_yticks([0,100,200,300])
+ax.set_yticks([0,100,200,300,400])
