@@ -105,7 +105,7 @@ def odd_end_ceiling(fob_dataset,used_time = np.arange(150,250)):
     return ceiling_index
     
 
-def Redplot(raw_data,base=np.arange(75,125),onset = np.arange(150,250)):
+def Redplot(raw_data,base=np.arange(75,125),onset = np.arange(160,320)):
     '''
     Calculate response d prime for data points in psth matrix.
     raw_data must be in shape(N_cellxN_framexN_time),remember to average different trail.
