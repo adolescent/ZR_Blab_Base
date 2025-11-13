@@ -81,6 +81,41 @@ def PSTH_From_Goodunit(good_unit_path,img_num = 1416):
 
     return PSTH
 
+def Train_From_Goodunit(good_unit_path,onset_time=300,fill_wrong=-1,tail_extend=1000,mute=False):
+    '''
+    For easy-reading, this script is a little memory-costing.
+    '''
+    
+    # loading meta data
+    data_dict = mat73.loadmat(good_unit_path,verbose=False) #mute warning.
+    all_spike_times = data_dict['GoodUnitStrc']['spiketime_ms']
+    stim_infos = data_dict['meta_data']['trial_valid_idx']  
+    stim_onset_time = data_dict['meta_data']['onset_time_ms']  
+    cellnum = len(all_spike_times)
+    record_len = len(data_dict['meta_data']['AIN'])+tail_extend # last 1s for error correction.
+
+    # define raster and trail array,in ms
+    trail_index = np.zeros(record_len,dtype='i4')
+    raw_rasters = np.zeros(shape = (cellnum,record_len),dtype='bool')
+    
+    # fill trail info first.
+    if mute == False:
+        print('Generating stim trains...')
+    for i,c_trail in enumerate(stim_onset_time):
+        c_id = stim_infos[i]
+        if c_id == 0: # wrong case:
+            trail_index[int(c_trail)] = int(fill_wrong)
+        else:
+            trail_index[int(c_trail):int(c_trail)+onset_time] = int(c_id)
+    # fill rasters dataset. This method is stupid, as most point here are zero..
+    if mute == False:
+        print('Filling spike rasters...')
+    for i,cc_spikes in enumerate(all_spike_times):
+        for j,c_time in enumerate(cc_spikes):
+            raw_rasters[i,int(c_time)] = True
+    
+    return raw_rasters,trail_index
+
 
 def odd_end_ceiling(fob_dataset,used_time = np.arange(150,250)):
     '''
@@ -158,3 +193,8 @@ def Calculate_Cell_Tunings(response,infos,base=np.arange(75,125),onset = np.aran
 
 
     return tuning_frame
+
+
+#%% testrun part just ignore it.
+if __name__ == '__main__':
+    good_unit_path = r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251105_ZhuangZhuang_Mega_Metamer_v251104_g1.mat'
