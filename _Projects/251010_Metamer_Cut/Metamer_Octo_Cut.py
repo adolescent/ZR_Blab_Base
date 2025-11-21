@@ -150,3 +150,5 @@ for j,c_n_path in tqdm(enumerate(n_paras)):
         c_name = str(10000+counter)[1:]+'.jpg'
         c_masked_img.save(ot.Join(n_path,c_name))
         counter+=1
+
+        
