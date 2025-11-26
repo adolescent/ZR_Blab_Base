@@ -194,7 +194,19 @@ def Calculate_Cell_Tunings(response,infos,base=np.arange(75,125),onset = np.aran
 
     return tuning_frame
 
+def Redplot_PCA_Arranger(response_plots,reverse=False):
+    PC_Comps,_,_ = Do_PCA(response_plots,'Cell',1)
+    y_ids = np.argsort(PC_Comps[0,:])
+    if reverse:
+        y_ids = y_ids[::-1]
+    arranged_redplot = response_plots[y_ids,:]
+
+    return arranged_redplot,y_ids
 
 #%% testrun part just ignore it.
 if __name__ == '__main__':
     good_unit_path = r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251105_ZhuangZhuang_Mega_Metamer_v251104_g1.mat'
+    import numpy as np
+    a = np.load('AA.zip')
+    b = a['raster_tests.npz']
+    
