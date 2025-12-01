@@ -174,7 +174,7 @@ class Single_Recording_Site(object):
 
     def ISI_Extractor(self):
         ISI_infos,prev_ids,have_break = ML_trail_Cutter(self.trail_index)
-        counter=0
+        # counter=0
         self.ISI_Info_Frame = pd.DataFrame(index=range(len(ISI_infos)),columns=['Before_Stim','Breaked','Raster_Series'])
         for i,c_series in enumerate(ISI_infos):
             c_frame = self.raw_rasters[:,c_series]
