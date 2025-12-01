@@ -62,9 +62,11 @@ def D_Prime(disp_A,disp_B):
     return d_prime
 
 
-def PSTH_From_Goodunit(good_unit_path,img_num = 1416):
-
-    data_dict = mat73.loadmat(good_unit_path,verbose=False) #mute warning.
+def PSTH_From_Goodunit(good_unit_path,img_num = 1416,input='path'):
+    if input == 'path':
+        data_dict = mat73.loadmat(good_unit_path,verbose=False) #mute warning.
+    elif input == 'dict':
+        data_dict = good_unit_path
     trail_info = data_dict['meta_data']['trial_valid_idx']  
     raster_info = data_dict['GoodUnitStrc']['Raster']
 
@@ -81,13 +83,13 @@ def PSTH_From_Goodunit(good_unit_path,img_num = 1416):
 
     return PSTH
 
-def Train_From_Goodunit(good_unit_path,onset_time=300,fill_wrong=-1,tail_extend=1000,mute=False):
+def Train_From_Goodunit(good_unit_dic,onset_time=300,fill_wrong=-1,tail_extend=1000,mute=False):
     '''
     For easy-reading, this script is a little memory-costing.
     '''
     
     # loading meta data
-    data_dict = mat73.loadmat(good_unit_path,verbose=False) #mute warning.
+    data_dict = good_unit_dic #mute warning.
     all_spike_times = data_dict['GoodUnitStrc']['spiketime_ms']
     stim_infos = data_dict['meta_data']['trial_valid_idx']  
     stim_onset_time = data_dict['meta_data']['onset_time_ms']  
@@ -202,6 +204,42 @@ def Redplot_PCA_Arranger(response_plots,reverse=False):
     arranged_redplot = response_plots[y_ids,:]
 
     return arranged_redplot,y_ids
+
+def ML_trail_Cutter(ml_id_train):
+
+    arr=ml_id_train
+    sequences = []
+    prev_ids = []
+    current_seq = []
+    
+    for i, val in tqdm(enumerate(arr)):
+        if val == 0 or val == -1:
+            current_seq.append(i)
+        elif current_seq:
+            sequences.append(current_seq)
+            # 找到前面的非零ID
+            first_idx = current_seq[0]
+            prev_id = 0
+            for j in range(first_idx-1, -1, -1):
+                if arr[j] not in [0, -1]:
+                    prev_id = arr[j]
+                    break
+            prev_ids.append(prev_id)
+            current_seq = []
+    
+    if current_seq:
+        sequences.append(current_seq)
+        first_idx = current_seq[0]
+        prev_id = 0
+        for j in range(first_idx-1, -1, -1):
+            if arr[j] not in [0, -1]:
+                prev_id = arr[j]
+                break
+        prev_ids.append(prev_id)
+    
+    return sequences, prev_ids
+
+
 
 #%% testrun part just ignore it.
 if __name__ == '__main__':
