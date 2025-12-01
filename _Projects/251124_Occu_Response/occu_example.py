@@ -17,7 +17,7 @@ import numpy as np
 from tqdm import tqdm
 import pandas as pd
 from PIL import Image, ImageEnhance
-
+import scipy
 
 
 gn_path = r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251108_ZhuangZhuang_Metamer_Singlebubble_v251107_4540_g2_MSB.mat'
@@ -30,9 +30,12 @@ psth = np.load(r'E:\#Preprocessed_Data\GoodUnits\251108_ZhuangZhuang_Metamer_Sin
 # test ceiling results vs fob ceiling.
 ceiling_thres = 0.25
 all_ceiling = odd_end_ceiling(psth,used_time=np.arange(160,320))
-ok_cells = np.where(all_ceiling>ceiling_thres)[0]
+ok_cells = np.where(all_ceiling>ceiling_thres)[0] 
 
-ceiled_response = psth[ok_cells,:,:,160:320].sum(-1).mean(1)
+ceiled_rasters = psth[ok_cells,:,:,:].mean(1)
+ceiled_response = ceiled_rasters[:,:,160:320].sum(-1)
+# scipy.io.savemat('MSB_Rasters.mat',{'Rasters':ceiled_rasters})
+# scipy.io.savemat('MSB_Redplot.mat',{'Redplot':ceiled_response})
 #%%
 ceiled_response_z = np.zeros(shape = (len(ok_cells),4540))
 for i in range(len(ok_cells)):

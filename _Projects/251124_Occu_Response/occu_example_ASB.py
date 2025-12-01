@@ -22,7 +22,7 @@ from PIL import Image, ImageEnhance
 
 gn_path = r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251110_ZhuangZhuang_Metamer_Singlebubble_v251107_4540_g1_AL_ASB.mat'
 stim_info,stim_masks,_ = Load_Info(r'Metamer_Singlebubble_v251107',load_mask=True)
-psth = PSTH_From_Goodunit(gn_path,img_num=4540)
+# psth = PSTH_From_Goodunit(gn_path,img_num=4540)
 # np.savez_compressed(r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251110_ZhuangZhuang_Metamer_Singlebubble_v251107_4540_g1_AL_ASB',psth = psth)
 psth = np.load(r'E:\#Preprocessed_Data\GoodUnits\GoodUnit_251110_ZhuangZhuang_Metamer_Singlebubble_v251107_4540_g1_AL_ASB.npz')['psth']
 
@@ -33,13 +33,18 @@ all_ceiling = odd_end_ceiling(psth,used_time=np.arange(160,320))
 ok_cells = np.where(all_ceiling>ceiling_thres)[0]
 
 ceiled_response = psth[ok_cells,:,:,160:320].sum(-1).mean(1)
+ceiled_rasters = psth[ok_cells,:,:,:].mean(1)
+
+ceiled_response = ceiled_response[np.concatenate((np.arange(125,210),np.arange(350,430)))]# remove AL
+ceiled_rasters = ceiled_rasters[np.concatenate((np.arange(125,210),np.arange(350,430))),:,:]
+
 #%%
 ceiled_response_z = np.zeros(shape = (len(ok_cells),4540))
 for i in range(len(ok_cells)):
     c_responses = ceiled_response[i,:]
     ceiled_response_z[i,:] = np.clip((c_responses-c_responses.mean())/c_responses.std(),-10,10)
 #%%
-response_arrange,idy = Redplot_PCA_Arranger(ceiled_response_z[np.concatenate((np.arange(125,210),np.arange(350,430))),:],reverse=True)
+response_arrange,idy = Redplot_PCA_Arranger(ceiled_response_z,reverse=True)
 #%% plot and annotate response of 
 N_sub = 9
 fig,ax = plt.subplots(ncols=1,nrows=1,dpi=240,figsize=(2,4))
