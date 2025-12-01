@@ -211,12 +211,16 @@ def ML_trail_Cutter(ml_id_train):
     sequences = []
     prev_ids = []
     current_seq = []
+    have_break=[]
     
-    for i, val in tqdm(enumerate(arr)):
+    for i, val in enumerate(arr):
         if val == 0 or val == -1:
             current_seq.append(i)
         elif current_seq:
             sequences.append(current_seq)
+            # 检查当前序列是否包含-1
+            contains_neg_one = any(arr[idx] == -1 for idx in current_seq)
+            have_break.append(contains_neg_one)
             # 找到前面的非零ID
             first_idx = current_seq[0]
             prev_id = 0
@@ -229,6 +233,11 @@ def ML_trail_Cutter(ml_id_train):
     
     if current_seq:
         sequences.append(current_seq)
+
+        # 检查最后一个序列是否包含-1
+        contains_neg_one = any(arr[idx] == -1 for idx in current_seq)
+        have_break.append(contains_neg_one)
+
         first_idx = current_seq[0]
         prev_id = 0
         for j in range(first_idx-1, -1, -1):
@@ -237,7 +246,7 @@ def ML_trail_Cutter(ml_id_train):
                 break
         prev_ids.append(prev_id)
     
-    return sequences, prev_ids
+    return sequences, prev_ids,have_break
 
 
 
