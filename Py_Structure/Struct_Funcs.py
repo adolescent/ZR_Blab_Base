@@ -106,7 +106,7 @@ class Single_Recording_Site(object):
 
         # get fob info sets for data processing.
         fob_parts = self.stim_info[self.stim_info['Stim_Set'].str.contains('FOB', na=False)]
-        fob_style = fob_parts['Stim_Set'][0]
+        fob_style = fob_parts['Stim_Set'].iloc[0]
         fob_resps = self.raw_redplot[:,np.array(fob_parts.index)]# already cutted, so we can index from 0.
 
         # label fob, getting info of response.
