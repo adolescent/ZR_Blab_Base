@@ -84,5 +84,13 @@ def Triangle_FOB(input_frame,show=True,width=800,height=600,label=False):
 
     return fig
 
+#%% Tuning Radarmap
+'''
+Different from triangle map, radar map will retain raw response of all FOB tuning, a cell can be good at both categories. This shows how this neuron response to all locs, FOB, FOBSF optional.
+'''
+def Radar_FOB(input_frame,show=True,normalize=False):
+    pass
+
+
 
 
