@@ -18,7 +18,7 @@ from Py_Structure.Struct_Funcs import Single_Recording_Site
 from Common_Functions.Useful_Plotter import *
 import copy
 
-msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
+msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB','.joblib')
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
 
 #%%
@@ -67,6 +67,7 @@ all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngro
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(save_path,'ASB_Cells.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(save_path,'MSB_Cells.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+
 
 
