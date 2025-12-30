@@ -18,7 +18,7 @@ from Py_Structure.Struct_Funcs import Single_Recording_Site
 from Common_Functions.Useful_Plotter import *
 import copy
 
-msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
+msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB','.joblib')
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
 
 #%%
@@ -30,7 +30,7 @@ for i,cloc in tqdm(enumerate(msb_sites)):
 
     ok_cells = np.array(c_info[c_info.Ceiling_Index>0.3].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
-    body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
+    body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
     body_cells = np.intersect1d(ok_cells, body_cells)
 
     # body_cells = np.array(ok_cells[ok_cells.Best_D_Prime>0.5].Cell)
@@ -67,7 +67,7 @@ all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngro
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(save_path,'ASB_Cells_Metamer_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(save_path,'MF_Cells_Metamer_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
 
 
 

@@ -35,6 +35,7 @@ class ImageDataset(Dataset):
         self.transform = transform
         self.image_paths = [os.path.join(image_folder, f) for f in os.listdir(image_folder) 
                            if f.endswith(('.jpg', '.jpeg', '.png'))]
+        self.image_paths.sort()
         
     def __len__(self):
         return len(self.image_paths)
@@ -88,8 +89,8 @@ def FC_Extractor(dataloader,layer='fc6'):
 
 #%%
 if __name__ == '__main__':
-    img_path = r'D:\_DataTemp\#stimuli\tmp2'
-    # img_path = r'D:\_DataTemp\#stimuli\Metamer_P4_C4321_Object_STI150_1300'
+    # img_path = r'D:\_DataTemp\#stimuli\tmp2'
+    img_path = r'Z:\Monkey\Stimuli\ZR\Metamer_P4_C4321_Object_STI150_1300'
     all_img_path = ot.Get_File_Name(img_path)
     transform = transforms.Compose([
     transforms.Resize(256),
