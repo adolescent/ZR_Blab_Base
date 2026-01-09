@@ -1,0 +1,7 @@
+使用opencv得到
+
+灰度的，
+boulder的，
+对比度控制的silct
+
+
