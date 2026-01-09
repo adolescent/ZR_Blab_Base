@@ -35,7 +35,8 @@ for i,cloc in tqdm(enumerate(msb_sites)):
 
     ok_cells = np.array(c_info[c_info.Ceiling_Index>0.3].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
-    body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
+    # body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
+    body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
     body_cells = np.intersect1d(ok_cells, body_cells)
     body_resps = a.avr_psth[body_cells,:,:]
 
@@ -64,7 +65,7 @@ all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngro
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(savepath,'MSB_Cells_Bubble.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(savepath,'MF_Cells_Bubble.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
 
 
 

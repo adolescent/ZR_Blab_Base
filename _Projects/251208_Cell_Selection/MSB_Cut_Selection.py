@@ -17,8 +17,8 @@ from Common_Functions.Useful_Plotter import *
 import copy
 from Matrix_Tools import *
 
-# sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
-sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB'
+sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
+# sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells'
 msb_sites = ot.Get_File_Name(sitepath,'.joblib')
 
@@ -35,6 +35,7 @@ for i,cloc in tqdm(enumerate(msb_sites)):
     ok_cells = np.array(c_info[c_info.Ceiling_Index>0.3].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
     body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
+    # body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
     body_cells = np.intersect1d(ok_cells, body_cells)
     body_resps = a.avr_psth[body_cells,:,:]
     # raw_rsp = a.avr_psth
@@ -68,7 +69,7 @@ all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngro
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(savepath,'MSB_Cells_Metamer_Cut_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(savepath,'ASB_Cells_Metamer_Cut_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
 
 
 
