@@ -96,8 +96,8 @@ def extract_silhouette(image_path, output_contour='contour.png', output_silhouet
 if __name__ == "__main__":
 
     
-    all_doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_1')
-    boulder_savepath = r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_1_Boulders_Raw'
+    all_doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_3')
+    boulder_savepath = r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_3_Boulders_Raw'
     silct_savepath = r'N.A.'
 
 

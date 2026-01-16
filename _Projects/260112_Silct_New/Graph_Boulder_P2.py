@@ -16,7 +16,7 @@ from tqdm import tqdm
 # 请将 'input.png' 替换为你的文件名
 # img = cv2.imread('10143_HD.jpg', cv2.IMREAD_GRAYSCALE)
 # --- 配置区域 ---
-def Boulder_Silct_New(img_path,boulder_path,silct_path,thres=120,min_area=100):
+def Boulder_Silct_New(img_path,boulder_path,silct_path,thres=120,min_area=100,save_boulder = True,save_silct=True):
     image_path = img_path     # 你的图片路径
     threshold_value = thres         # 阈值：低于此值的像素被认为是线条/前景
     min_area_threshold = min_area      # 【关键新增】最小面积阈值。
@@ -68,17 +68,19 @@ def Boulder_Silct_New(img_path,boulder_path,silct_path,thres=120,min_area=100):
         cv2.drawContours(fill_canvas, valid_contours, -1, 0, -1)
 
         # 保存结果
-        cv2.imwrite(boulder_path, stroke_canvas)
-        cv2.imwrite(silct_path, fill_canvas)
+        if save_boulder:
+            cv2.imwrite(boulder_path, stroke_canvas)
+        if save_silct:
+            cv2.imwrite(silct_path, fill_canvas)
         # print("处理完成！无噪点图像已保存。")
     else:
         print("未检测到符合要求的闭合轮廓，请检查阈值或面积过滤设置。")
     return stroke_canvas,fill_canvas
 #%% 运行部分
 if __name__ == '__main__':
-    all_doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\Batch2_HD_Boulder_Raw')
-    boulder_savepath = r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Boulder'
-    silct_savepath = r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Silct'
+    all_doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_3_Boulders_Raw')
+    boulder_savepath = r'N.A.'
+    silct_savepath = r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\AI_Real_3_Silct'
     for i,image_path in tqdm(enumerate(all_doodle_path)):
         # 替换为你的图片路径
         c_filename = image_path.split('\\')[-1]
@@ -89,5 +91,5 @@ if __name__ == '__main__':
         contour_img, silhouette_img = Boulder_Silct_New(
             image_path,
             boulder_path=counter_filename,
-            silct_path=silct_filename
+            silct_path=silct_filename,save_boulder=False
         )
