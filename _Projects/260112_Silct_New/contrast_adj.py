@@ -8,7 +8,10 @@
 #%%
 import cv2
 import numpy as np
+import OS_Tools as ot
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 
 # 或者，如果只需要最简单的方法，可以使用以下代码
 def simple_contrast_match(img1_path, img2_path, output_path='result.png'):
@@ -47,9 +50,9 @@ def simple_contrast_match(img1_path, img2_path, output_path='result.png'):
     original_contrast = np.std(cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY))
     new_contrast = np.std(cv2.cvtColor(result, cv2.COLOR_BGR2GRAY))
     
-    print(f"目标对比度 (img1): {target_contrast:.2f}")
-    print(f"原始对比度 (img2): {original_contrast:.2f}")
-    print(f"调整后对比度: {new_contrast:.2f}")
+    # print(f"目标对比度 (img1): {target_contrast:.2f}")
+    # print(f"原始对比度 (img2): {original_contrast:.2f}")
+    # print(f"调整后对比度: {new_contrast:.2f}")
     
     return result
 
@@ -59,7 +62,15 @@ def simple_contrast_match(img1_path, img2_path, output_path='result.png'):
 
 
 #%%
-
-result = simple_contrast_match('GoodOne!.png', 'GoodOne_Silct.png', 'output.png')
-
+if __name__ == '__main__':
+    doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Gray_Norm')
+    silct_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\Batch2_HD_Silct')
+    # result = simple_contrast_match('GoodOne!.png', 'GoodOne_Silct.png', 'output.png')
+    savepath=r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Silct_Norm'
+    for i in tqdm(range(200)):
+        c_doodle = doodle_path[i]
+        c_silct = silct_path[i]
+        c_filename = c_silct.split('\\')[-1]
+        c_savename = ot.Join(savepath,c_filename)
+        normed_silct = simple_contrast_match(c_doodle,c_silct,c_savename)
 

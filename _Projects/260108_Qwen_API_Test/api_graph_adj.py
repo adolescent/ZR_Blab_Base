@@ -17,7 +17,7 @@ import requests
 from dashscope import ImageSynthesis
 import os
 
-# api_key="sk-此处填入api key"
+api_key="sk-此处填入api key"
 
 
 # --- 辅助函数：用于 Base64 编码 ---
