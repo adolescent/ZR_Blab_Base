@@ -57,7 +57,8 @@ for i in tqdm(range(len(names))):
 
 #%% ## 单张图微调
 # prompt = f"生成一个外卡钳（Calipers），真实图片风格。背景是灰色的纯色背景"
-prompt= '生成一个鲤鱼钳，真实图片风格。背景是灰色的纯色背景'
+prompt= '生成一个正在旋转的陀螺，不要生成任何背景。真实图片风格，背景是纯白色'
+# prompt = 'Generate a platypus on gray background. Gray style shall be realistic.'
 rsp = ImageSynthesis.call(api_key=api_key,
                         # model="wanx2.1-t2i-turbo", # 当前仅qwen-image-plus、qwen-image模型支持异步接口
                         model="wanx2.1-t2i-plus",
@@ -68,7 +69,7 @@ rsp = ImageSynthesis.call(api_key=api_key,
                         prompt_extend=True,
                         watermark=False)
 result=rsp.output.results[0]
-save_filepath = '10316_HD.jpg'
+save_filepath = '10378_HD.jpg'
 with open(save_filepath, 'wb+') as f:
     f.write(requests.get(result.url).content)
 del rsp

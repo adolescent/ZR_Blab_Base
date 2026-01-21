@@ -42,13 +42,18 @@ def simple_contrast_match(img1_path, img2_path, output_path='result.png'):
     # 合并通道并转换回BGR
     lab_adjusted = cv2.merge([l_adjusted, a, b])
     result = cv2.cvtColor(lab_adjusted, cv2.COLOR_LAB2BGR)
-    
+    counts = np.bincount(result.flatten())
+    # 找到出现次数最多的两个值（排除0次的情况）
+    top_two_indices = np.argsort(counts)[-2:][::-1]  # 取最大的两个，并降序排列
+    color_diff = 127-top_two_indices[0]
+    result = result+color_diff
+
     # 保存结果
     cv2.imwrite(output_path, result)
     
     # 打印对比度信息
-    original_contrast = np.std(cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY))
-    new_contrast = np.std(cv2.cvtColor(result, cv2.COLOR_BGR2GRAY))
+    # original_contrast = np.std(cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY))
+    # new_contrast = np.std(cv2.cvtColor(result, cv2.COLOR_BGR2GRAY))
     
     # print(f"目标对比度 (img1): {target_contrast:.2f}")
     # print(f"原始对比度 (img2): {original_contrast:.2f}")
@@ -59,15 +64,13 @@ def simple_contrast_match(img1_path, img2_path, output_path='result.png'):
 # 使用简单版本
 # result = simple_contrast_match('img1.png', 'img2.png', 'output.png')
 
-
-
 #%%
 if __name__ == '__main__':
-    doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Gray_Norm')
-    silct_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\Batch2_HD_Silct')
+    doodle_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_HD_Gray_Norm')
+    silct_path = ot.Get_File_Name(r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\HD_Silct')
     # result = simple_contrast_match('GoodOne!.png', 'GoodOne_Silct.png', 'output.png')
-    savepath=r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_Batch2_HD_Silct_Norm'
-    for i in tqdm(range(200)):
+    savepath=r'E:\#Stimsets\Silct\Silct_New_260112\Raw_Doodle\_Doodle_HD_Silct_Norm'
+    for i in tqdm(range(400)):
         c_doodle = doodle_path[i]
         c_silct = silct_path[i]
         c_filename = c_silct.split('\\')[-1]
