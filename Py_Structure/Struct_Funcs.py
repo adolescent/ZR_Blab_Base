@@ -116,7 +116,11 @@ class Single_Recording_Site(object):
         elif 'FOB72' in fob_style:
             stim_cats = ['Face','Body','Object']
         else:
-            raise ValueError('FOB Struct Not supported.')
+            print('FOB Method not supported or No FOB.')
+            self.Cell_FOB_Response = self.Cell_FOB_Response.dropna(how='any')
+            self.Cell_FOB_DPrimes = self.Cell_FOB_DPrimes.dropna(how='any')
+            # raise ValueError('FOB Struct Not supported.')
+            return # end this function.
         
         counter=0
         for i in range(len(fob_parts)):
@@ -159,14 +163,19 @@ class Single_Recording_Site(object):
         self.Site_Info['Cell_Type']=ac_types
         
         # cycle cell for best d prime and 
-        best_dps = []
-        best_dp_cats = []
-        for i in range(self.cellnum):
-            c_pref = self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Cell==i]
-            best_dps.append(c_pref.D_Prime.max())
-            best_dp_cats.append(c_pref.loc[c_pref.D_Prime.idxmax(),'Category'])
-        self.Site_Info['Best_Prefer'] = best_dp_cats
-        self.Site_Info['Best_D_Prime'] = best_dps
+        if len(self.Cell_FOB_DPrimes) != 0:
+            best_dps = []
+            best_dp_cats = []
+            for i in range(self.cellnum):
+                c_pref = self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Cell==i]
+                best_dps.append(c_pref.D_Prime.max())
+                best_dp_cats.append(c_pref.loc[c_pref.D_Prime.idxmax(),'Category'])
+            self.Site_Info['Best_Prefer'] = best_dp_cats
+            self.Site_Info['Best_D_Prime'] = best_dps
+        else:
+            print('FOB Not provided.')
+            self.Site_Info['Best_Prefer'] = 'None'
+            self.Site_Info['Best_D_Prime'] = 0
 
         # site info
         self.Site_Info['Site'] = self.site_name

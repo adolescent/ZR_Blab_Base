@@ -108,3 +108,23 @@ stim_infos['Stim_Set'] = stim_sets
 stim_infos['Object'] = objects
 
 stim_infos.to_csv('Doodle_AI_v260119.tsv', sep='\t', index=True)
+
+#%% ################ P2 NSD Generation ################
+filename = ot.Get_File_Name(r'Z:\Monkey\Stimuli\LYP\NSD1000','.tsv')[0]
+stim_infos = pd.read_csv(filename, sep='\t')
+stim_infos['Stim_Set']='Default' # stim set of given stim
+stim_infos['Category']='Default' # category of stimtype,sepereted by '_'
+stim_infos['Object']=-1 # object of given stim, 1-40 as input data sets, and -1 for fob.
+
+stim_sets = []
+categories = []
+objects = []
+for i in range(1000):
+    stim_sets.append('NSD_1k')
+    objects.append(i+1) # 1-400
+    categories.append('NSD')
+    
+stim_infos['Category'] = categories
+stim_infos['Stim_Set'] = stim_sets
+stim_infos['Object'] = objects
+stim_infos.to_csv('NSD_1k.tsv', sep='\t', index=True)
