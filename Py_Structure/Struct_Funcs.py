@@ -36,6 +36,7 @@ class Single_Recording_Site(object):
                  offset=200,
                  used_on = np.arange(160,320),
                  save_train=True,
+                 prepare_data = True
                  ):
         '''
         Save path need to be updated after load and save.
@@ -55,9 +56,10 @@ class Single_Recording_Site(object):
         self.used_on = used_on
 
         #### Data prepare.
-        self.Data_Prepare(save_train=save_train)
-        # after data transfer, del gn dict.
-        del self.gn_dic
+        if prepare_data:
+            self.Data_Prepare(save_train=save_train)
+            # after data transfer, del gn dict.
+            del self.gn_dic
 
 
     def Data_Prepare(self,save_train):
@@ -105,7 +107,15 @@ class Single_Recording_Site(object):
         self.Cell_FOB_DPrimes = pd.DataFrame(index=range(100000000),columns = ['Cell','D_Prime','Category'])
 
         # get fob info sets for data processing.
+
         fob_parts = self.stim_info[self.stim_info['Stim_Set'].str.contains('FOB', na=False)]
+        if len(fob_parts)==0: # ifno avaliable fob
+            print('FOB Method not supported or No FOB.')
+            self.Cell_FOB_Response = self.Cell_FOB_Response.dropna(how='any')
+            self.Cell_FOB_DPrimes = self.Cell_FOB_DPrimes.dropna(how='any')
+            # raise ValueError('FOB Struct Not supported.')
+            return # end this function.
+        
         fob_style = fob_parts['Stim_Set'].iloc[0]
         fob_resps = self.raw_redplot[:,np.array(fob_parts.index)]# already cutted, so we can index from 0.
 
@@ -116,11 +126,7 @@ class Single_Recording_Site(object):
         elif 'FOB72' in fob_style:
             stim_cats = ['Face','Body','Object']
         else:
-            print('FOB Method not supported or No FOB.')
-            self.Cell_FOB_Response = self.Cell_FOB_Response.dropna(how='any')
-            self.Cell_FOB_DPrimes = self.Cell_FOB_DPrimes.dropna(how='any')
-            # raise ValueError('FOB Struct Not supported.')
-            return # end this function.
+            raise ValueError('FOB Method unsupported.')
         
         counter=0
         for i in range(len(fob_parts)):
