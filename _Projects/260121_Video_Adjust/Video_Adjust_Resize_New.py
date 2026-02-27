@@ -12,8 +12,8 @@ import numpy as np
 from tqdm import tqdm
 
 
-raw_path = r'E:\#Stimsets\Face_Reconstruction\Raw_Video'
-savepath = r'E:\#Stimsets\Face_Reconstruction\Resized_Video'
+raw_path = r'E:\#Stimsets\Face_Reconstruction_Nova\task_video_orig'
+savepath = r'E:\#Stimsets\Face_Reconstruction_Nova\task_video_adj'
 all_videos = ot.Get_File_Name(raw_path,'.avi')
 all_videos.sort()
 output_file = 'output.avi'
@@ -57,8 +57,8 @@ def Generate_Video(input_file,output_file):
 
 #%%
 if __name__ == "__main__":
-    raw_path = r'E:\#Stimsets\Face_Reconstruction\Raw_Video'
-    savepath = r'E:\#Stimsets\Face_Reconstruction\Resized_Video'
+    raw_path = r'E:\#Stimsets\Face_Reconstruction_Nova\task_video_orig'
+    savepath = r'E:\#Stimsets\Face_Reconstruction_Nova\task_video_adj'
     raw_names = ot.Get_File_Name(raw_path,'.avi')
     for i,c_filename in tqdm(enumerate(raw_names)):
         c_name = 'Emotion_'+c_filename.split('\\')[-1][:-4]+'.avi'
