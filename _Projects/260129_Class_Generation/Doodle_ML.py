@@ -41,7 +41,7 @@ for i,cloc in tqdm(enumerate(all_site_path)):
     tuned_resps = a.avr_psth[tuned_cells,:,:]
 
 
-    if a.stimset == 'Doodle_v260119' or a.stimset == 'Doodle_v260119':
+    if a.stimset == 'Doodle_v260119' or a.stimset == 'Doodle_v260121':
         selected_stim = tuned_resps
     else:
         print(f'Location {cloc} is not a doodle site.')
@@ -77,4 +77,3 @@ all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngro
 
 #%% save all msb cells
 np.savez_compressed(ot.Join(save_path,'Doodle_All_ML_Response.npz'),psth = all_tuned_resp,d_primes = all_d_primes,response = all_response)
-

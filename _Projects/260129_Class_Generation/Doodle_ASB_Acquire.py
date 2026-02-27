@@ -28,8 +28,8 @@ for i,cloc in tqdm(enumerate(all_site_path)):
     c_info = a.Site_Info
     c_loc = a.site_name
     rec_site = a.brain_areas
-    if 'MSB' not in rec_site:
-        print('No MSB. Continue')
+    if 'ASB' not in rec_site:
+        print('No ASB. Continue')
         continue
 
     ok_cells = c_info[c_info.Ceiling_Index>0.3]
@@ -44,11 +44,12 @@ for i,cloc in tqdm(enumerate(all_site_path)):
     else:
         print(f'Location {cloc} is not a doodle site.')
         continue
+
     # generate concated response.
-    if i == 0:
-        all_tuned_resp = copy.deepcopy(selected_stim)
-    else:
+    try:# If no var, init.
         all_tuned_resp = np.concatenate([all_tuned_resp,selected_stim],axis=0)
+    except:
+        all_tuned_resp = copy.deepcopy(selected_stim)
 
     # generate cell infos.
     c_dps = a.Cell_FOB_DPrimes
@@ -62,12 +63,13 @@ for i,cloc in tqdm(enumerate(all_site_path)):
     c_dps['Stimset'] = a.stimset
     c_rsp['Stimset'] = a.stimset
 
-    if i ==0:
-        all_d_primes = copy.deepcopy(c_dps)
-        all_response = copy.deepcopy(c_rsp)
-    else:
+    try:
         all_d_primes = pd.concat((all_d_primes,c_dps))
         all_response = pd.concat((all_response,c_rsp))
+    except:
+        all_d_primes = copy.deepcopy(c_dps)
+        all_response = copy.deepcopy(c_rsp)
+        
     del a
 
 all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngroup()
@@ -75,5 +77,5 @@ all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngro
 
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(save_path,'Doodle_All_MSB_Response.npz'),psth = all_tuned_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(save_path,'Doodle_All_ASB_Response.npz'),psth = all_tuned_resp,d_primes = all_d_primes,response = all_response)
 
