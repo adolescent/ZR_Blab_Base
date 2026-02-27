@@ -35,7 +35,7 @@ class Single_Recording_Site(object):
                  onset=300,
                  offset=200,
                  used_on = np.arange(160,320),
-                 save_train=True,
+                 save_train=False,
                  prepare_data = True
                  ):
         '''
