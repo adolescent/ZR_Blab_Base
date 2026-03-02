@@ -12,7 +12,7 @@ from PIL import Image
 from tqdm import tqdm
 import numpy as np
 
-savepath = r'Z:\Monkey_ephys\data_nas3\Zhangrui\Backups\Stimset_Generation\anagram_jigsaw_260224\260227_Anagram_Jigsaw'
+savepath = r'E:\#Stimsets\Silct_Localizer\Doodle_Localizer240'
 
 counter=1
 
@@ -36,50 +36,75 @@ def resize_image(input_path, output_path, new_size=(400, 400)):
 
 
 #%% Batch 1
-batch_path1 = r'Z:\Monkey_ephys\data_nas3\Zhangrui\Backups\Stimset_Generation\anagram_jigsaw_260224\batch1'
-batch_path2 = r'Z:\Monkey_ephys\data_nas3\Zhangrui\Backups\Stimset_Generation\anagram_jigsaw_260224\batch2'
-batch_path3 = r'Z:\Monkey_ephys\data_nas3\Zhangrui\Backups\Stimset_Generation\anagram_jigsaw_260224\batch3'
-batch_path4 = r'Z:\Monkey_ephys\data_nas3\Zhangrui\Backups\Stimset_Generation\anagram_jigsaw_260224\batch4'
-batches = [batch_path1,batch_path2,batch_path3,batch_path4]
+body_raw = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\body_real')
+face_raw = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\face_real')
+spiky_raw = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\spiky_real')
+stubby_raw = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\stubby_real')
+body_doodle = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\body_doodle','.png')
+face_doodle = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\face_doodle','.png')
+spiky_doodle = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\spiky_doodle','.png')
+stubby_doodle = ot.Get_File_Name(r'E:\#Stimsets\Silct_Localizer\stubby_doodle','.png')
 
-all_img = []
-for i,c_batch in enumerate(batches):
-    all_img += ot.Get_File_Name(c_batch,'.png')
-all_img.sort()
-#%% 
-p1 = all_img[::2]
-p2 = all_img[1::2]
-# p1 三个循环
-p1_n1 = p1[::3]
-p1_n2 = p1[1::3]
-p1_n3 = p1[2::3]
-# p2 三个循环
-p2_n1 = p2[::3]
-p2_n2 = p2[1::3]
-p2_n3 = p2[2::3]
 
-p1_n1_s1 = p1_n1[::5]
 
 #%% resize graph and rename.
 counter = 1
-for i in range(3):# 3 cycle
-    c_p1 = [p1_n1,p1_n2,p1_n3][i]
-    c_p2 = [p2_n1,p2_n2,p2_n3][i]
-    for j in range(5):# 5 styles
-        c_subtype_p1 = c_p1[j::5]
-        c_subtype_p2 = c_p2[j::5]
-        for k in tqdm(range(20)): # cycle objs.  
-            #obj1
-            c_img_a = c_subtype_p1[k]
-            c_name_new_a = str(10000+counter)+'.jpg'
-            save_filename_a = ot.Join(savepath,c_name_new_a)
-            resize_image(c_img_a,save_filename_a)
-            counter += 1
-            #obj2
-            c_img_b = c_subtype_p2[k]
-            c_name_new_b = str(10000+counter)+'.jpg'
-            save_filename_b = ot.Join(savepath,c_name_new_b)
-            resize_image(c_img_b,save_filename_b)
-            counter += 1
+for j,c_set in enumerate([body_raw,face_raw,spiky_raw,stubby_raw,body_doodle,face_doodle,spiky_doodle,stubby_doodle]):
+    for i,c_img in enumerate(c_set):
+
+        c_name_new_a = str(10000+counter)+'.png'
+        save_filename_a = ot.Join(savepath,c_name_new_a)
+        resize_image(c_img,save_filename_a)
+        counter += 1
 
 
+#%%
+############################ GENERATE FOB INFO and Python-style INFO ##############################
+
+import csv
+
+# 定义输出文件名
+output_file = 'doodleLOC_info.tsv'
+
+# 定义数据行数
+num_rows = 240
+
+# 准备数据（包含标题行）
+data = []
+# 添加标题
+data.append(['Index', 'FileName', 'Category', 'FOB'])
+
+# 生成数据行
+for i in range(1, num_rows + 1):
+    file_name = f"{10000 + i}.png"  # 1001.jpg, 1002.jpg, ...
+    c_cat = (i-1)//30
+    all_labels = ['Body','Face','Spiky','Stubby','Body_s','Face_s','Spiky_s','Stubby_s']
+    row = [i, file_name, 'DoodleLoc',all_labels[c_cat]]
+    data.append(row)
+
+# 写入CSV文件（使用制表符分隔）
+with open(output_file, 'w', newline='', encoding='utf-8') as f:
+    writer = csv.writer(f, delimiter='\t')
+    writer.writerows(data)
+
+print(f"CSV文件已生成：{output_file}")
+#%%
+############################### PYTHON STYLE INFO ######################################
+
+# 定义输出文件名
+output_file = 'DoodleLOC.tsv'
+
+data = []
+# 添加标题
+data.append(['FileName','Category','Stim_Set','Object'])
+
+# 定义数据行数
+num_rows = 240
+
+# 生成数据行
+for i in range(1, num_rows + 1):
+    file_name = f"{10000 + i}.png"  # 1001.jpg, 1002.jpg, ...
+    c_cat = (i-1)//30
+    all_labels = ['Body','Face','Spiky','Stubby','Body_s','Face_s','Spiky_s','Stubby_s']
+    row = [ file_name, all_labels[c_cat],'FOB_DoodleLOC',-1]
+    data.append(row)
