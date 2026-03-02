@@ -42,9 +42,6 @@ for i in range(400): # cycle objects
 
 
 
-
-
-
 #%% fob parts at last
 
 for i in range(3): # 1 repeats

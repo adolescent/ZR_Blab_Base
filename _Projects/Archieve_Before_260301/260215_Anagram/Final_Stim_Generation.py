@@ -90,9 +90,10 @@ with open(output_file, 'w', newline='', encoding='utf-8') as f:
 print(f"CSV文件已生成：{output_file}")
 #%%
 ############################### PYTHON STYLE INFO ######################################
+import pandas as pd
 
 # 定义输出文件名
-output_file = 'DoodleLOC.tsv'
+# output_file = 'DoodleLOC.tsv'
 
 data = []
 # 添加标题
@@ -108,3 +109,7 @@ for i in range(1, num_rows + 1):
     all_labels = ['Body','Face','Spiky','Stubby','Body_s','Face_s','Spiky_s','Stubby_s']
     row = [ file_name, all_labels[c_cat],'FOB_DoodleLOC',-1]
     data.append(row)
+    
+# 写入CSV文件（使用制表符分隔）
+df = pd.DataFrame(data[1:], columns=data[0])
+df.to_csv( 'DoodleLOC.tsv', sep='\t', index=True)
