@@ -17,7 +17,7 @@ import copy
 import gc
 
 warnings.filterwarnings("ignore")
-wp=r'E:\#Preprocessed_Data\SiteClass\Doodle'
+wp=r'E:\#Preprocessed_Data\SiteClass\Doodle\MSB'
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
 
 all_site_path = ot.Get_File_Name(wp,'.joblib')
@@ -29,8 +29,8 @@ for i,cloc in tqdm(enumerate(all_site_path)):
     c_info = a.Site_Info
     c_loc = a.site_name
     rec_site = a.brain_areas
-    if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
-    # if 'MSB' not in rec_site:
+    # if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
+    if 'MSB' not in rec_site:
         print('No Target area. Continue')
 
         del a
@@ -39,7 +39,7 @@ for i,cloc in tqdm(enumerate(all_site_path)):
 
     ok_cells = c_info[c_info.Ceiling_Index>(0.3/1.7)]
     ok_cells = ok_cells[ok_cells.Best_D_Prime>0.5]
-    tuned_cells = np.array(ok_cells[ok_cells.Best_Prefer=='Face'].Cell)
+    tuned_cells = np.array(ok_cells[ok_cells.Best_Prefer=='Body'].Cell)
     print(len(tuned_cells))
     tuned_resps = a.avr_psth[tuned_cells,:,:]
 
@@ -85,5 +85,17 @@ all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngro
 
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(save_path,'Doodle_All_ML_Response.npz'),psth = all_tuned_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(save_path,'Doodle_All_MSB_Response.npz'),psth = all_tuned_resp,d_primes = all_d_primes,response = all_response)
+
+print(set(all_d_primes.Loc))
+#%% counts 
+counter = 0
+acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
+for i in range(len(acs)):
+    cc_loc = acs.loc[i,'Loc']
+    if ('MD' in cc_loc) or ('Mao' in cc_loc):
+    # if 'FaCai' in cc_loc:
+        counter+=1
+print(len(acs))
+print(counter)
 

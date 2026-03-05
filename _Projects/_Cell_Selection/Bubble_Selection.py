@@ -80,6 +80,16 @@ all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngro
 
 #%% save all msb cells
 np.savez_compressed(ot.Join(savepath,'ASB_Cells_Bubble.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+print(set(all_d_primes.Loc))
+#%% counts 
+counter = 0
+acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
+for i in range(len(acs)):
+    cc_loc = acs.loc[i,'Loc']
+    # if ('MD' in cc_loc) or ('Mao' in cc_loc):
+    if 'Zhuang' in cc_loc:
+        counter+=1
 
-
+print(len(acs))
+print(counter)
 

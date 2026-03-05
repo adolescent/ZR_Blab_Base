@@ -15,10 +15,11 @@ import joblib as JL
 from Py_Structure.Struct_Funcs import Single_Recording_Site
 from Common_Functions.Useful_Plotter import *
 import copy
+import gc
 from Matrix_Tools import *
 
-sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
-# sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB'
+# sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
+sitepath = r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells'
 msb_sites = ot.Get_File_Name(sitepath,'.joblib')
 
@@ -29,10 +30,21 @@ for i,cloc in tqdm(enumerate(msb_sites)):
     c_info = a.Site_Info
     c_loc = a.site_name
     stimeset = a.stimset
+    print(c_loc)
+    # select brain area 
+    # if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
+    if 'MSB' not in a.brain_areas:
+        print(f'Not Correct Area, ignore {cloc}.')
+        del a
+        gc.collect()
+        continue
     # select only cut-shuffle contained runs.
     if stimeset!='Metamer_Cut_v251011' and stimeset!='Mega_Metamer_v251104':
+        print(f'{c_loc} not correct stimset, ignore.')
+        del a
+        gc.collect()
         continue
-    ok_cells = np.array(c_info[c_info.Ceiling_Index>0.3].Cell)
+    ok_cells = np.array(c_info[c_info.Ceiling_Index>(0.3/1.7)].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
     body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
     # body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
@@ -64,12 +76,25 @@ for i,cloc in tqdm(enumerate(msb_sites)):
         all_response = pd.concat((all_response,c_rsp))
         all_matemer_resp = np.concatenate([all_matemer_resp,metamer_cutshuffle],axis=0)
     site_counter += 1
+    del a
+    gc.collect()
 
 all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngroup()
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(savepath,'ASB_Cells_Metamer_Cut_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+np.savez_compressed(ot.Join(savepath,'MSB_Cells_Metamer_Cut_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+print(set(all_d_primes.Loc))
 
+#%% counts 
+counter = 0
+acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
+for i in range(len(acs)):
+    cc_loc = acs.loc[i,'Loc']
+    # if ('MD' in cc_loc) or ('Mao' in cc_loc):
+    if 'MD' in cc_loc:
+        counter+=1
 
+print(len(acs))
+print(counter)
 

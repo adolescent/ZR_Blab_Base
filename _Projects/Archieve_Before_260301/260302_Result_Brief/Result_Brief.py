@@ -12,12 +12,12 @@ from tqdm import tqdm
 
 
 wp=r'E:\#Preprocessed_Data\Selected_Cells'
-cellname = 'Doodle_All_MSB_Response.npz'
+cellname = 'MSB_Cells_Bubble.npz'
 fullpath = ot.Join(wp,cellname)
 
 ac_infos = np.load(fullpath,allow_pickle=True)
-ac_dp = pd.DataFrame(ac_infos['d_primes'],columns = ['Cell','DP','Category','Loc','Stimset','ID'])
-ac_rsp = pd.DataFrame(ac_infos['response'],columns = ['Cell','DP','Category','Loc','Stimset','ID'])
+ac_dp = pd.DataFrame(ac_infos['d_primes'],columns = ['Cell','DP','Category','Loc','ID'])
+ac_rsp = pd.DataFrame(ac_infos['response'],columns = ['Cell','DP','Category','Loc','ID'])
 #%% get cell counts
 cell_num,_,_ = ac_infos['psth'].shape
 body_dp = ac_dp[ac_dp.Category=='Body'].reset_index(drop=True)
@@ -28,5 +28,5 @@ counter = 0
 for i in tqdm(range(cell_num)):
     ccloc = body_dp.loc[i,'Loc']
     # if ('Maodan' in ccloc) or ('MD' in ccloc) or ('MaoDan' in ccloc):
-    if 'Mao' in ccloc:
+    if 'Zhuang' in ccloc:
         counter +=1

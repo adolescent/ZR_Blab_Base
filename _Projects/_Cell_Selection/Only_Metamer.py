@@ -30,6 +30,7 @@ for i,cloc in tqdm(enumerate(msb_sites)):
     c_info = a.Site_Info
     c_loc = a.site_name
     if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
+    # if 'AL' not in a.brain_areas:
         print(f'Not Correct Area, ignore {cloc.split('\\')[-1]}.')
         del a
         gc.collect()
@@ -81,5 +82,17 @@ all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngro
 
 #%% save all msb cells
 np.savez_compressed(ot.Join(save_path,'ML_Cells_Metamer_Only.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+
+print(set(all_d_primes.Loc))
+#%% counts 
+counter = 0
+acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
+for i in range(len(acs)):
+    cc_loc = acs.loc[i,'Loc']
+    # if ('MD' in cc_loc) or ('Mao' in cc_loc):
+    if 'Jian' in cc_loc:
+        counter+=1
+print(len(acs))
+print(counter)
 
 

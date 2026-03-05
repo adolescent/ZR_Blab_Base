@@ -28,10 +28,10 @@ for i,cloc in tqdm(enumerate(msb_sites)):
     c_info = a.Site_Info
     c_loc = a.site_name
     stimeset = a.stimset
-
+    print(c_loc)
     # select brian area.
     # if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
-    if 'AL' not in a.brain_areas:
+    if 'ASB' not in a.brain_areas:
         print(f'Not Correct Area, ignore {cloc}.')
         del a
         gc.collect()
@@ -46,8 +46,8 @@ for i,cloc in tqdm(enumerate(msb_sites)):
 
     ok_cells = np.array(c_info[c_info.Ceiling_Index>(0.3/1.7)].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
-    # body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
-    body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
+    body_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
+    # body_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
     body_cells = np.intersect1d(ok_cells, body_cells)
 
     body_resps = a.avr_psth[body_cells,:,:]
@@ -83,5 +83,22 @@ all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngro
 all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 
 #%% save all msb cells
-np.savez_compressed(ot.Join(savepath,'AL_Cells_Metamer_Cutshuffle.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+
+
+np.savez_compressed(ot.Join(savepath,'ASB_Cells_Metamer_Cutshuffle.npz'),psth = all_matemer_resp,d_primes = all_d_primes,response = all_response)
+print(set(all_d_primes.Loc))
+
+
+#%% counts 
+counter = 0
+acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
+for i in range(len(acs)):
+    cc_loc = acs.loc[i,'Loc']
+    # if ('MD' in cc_loc) or ('Mao' in cc_loc):
+    if 'Jian' in cc_loc:
+        counter+=1
+
+print(len(acs))
+print(counter)
+
 
