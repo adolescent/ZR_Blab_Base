@@ -120,7 +120,14 @@ for _, cloc in tqdm(enumerate(msb_sites), total=len(msb_sites)):
     gc.collect()
 
 all_matemer_resp = np.concatenate(all_metamer_resp_list, axis=0) if len(all_metamer_resp_list) else np.empty((0, 0, 0))
-all_fob_resp = np.concatenate(all_fob_resp_list, axis=0) if len(all_fob_resp_list) else np.empty((0, 0, 0))
+# Ensure that all fob_resp arrays have shape (N_cells, 300, 450); pad with NaN if only 72 FOBs are present
+normalized_fob_list = []
+for arr in all_fob_resp_list:
+    if arr.shape[1] == 72:
+        pad_width = ((0, 0), (0, 300 - 72), (0, 0))
+        arr = np.pad(arr, pad_width, mode='constant', constant_values=0)
+    normalized_fob_list.append(arr)
+all_fob_resp = np.concatenate(normalized_fob_list, axis=0) if len(normalized_fob_list) else np.empty((0, 0, 0))
 all_d_primes = pd.concat(all_d_primes_list, ignore_index=True) if len(all_d_primes_list) else pd.DataFrame()
 all_response = pd.concat(all_response_list, ignore_index=True) if len(all_response_list) else pd.DataFrame()
 
@@ -129,7 +136,7 @@ if len(all_d_primes):
 if len(all_response):
     all_response['Cell_ID'] = all_response.groupby(['Loc', 'Cell'], sort=False).ngroup()
 #%% ## Plot response heatmap.
-fob_avr = all_fob_resp[:,:,160:320].sum(-1)
+fob_avr = np.nan_to_num(all_fob_resp[:,:,160:320]).sum(-1)
 plotable = fob_avr/fob_avr.max(1,keepdims = True)
 sns.heatmap(plotable,center=0,cmap='bwr')
 
