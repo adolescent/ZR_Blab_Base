@@ -21,9 +21,15 @@ import pandas as pd
 import numpy as np
 warnings.filterwarnings("ignore")
 
-msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB','.joblib')
+# msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
-target_area = 'ML'
+target_area = 'ASB'
+
+if (target_area == 'ASB') or (target_area == 'AL'):
+    msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
+else:
+    msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\MSB','.joblib')
+
 #%%
 def _get_stimset_series(stim_info):
     """
@@ -53,20 +59,26 @@ for _, cloc in tqdm(enumerate(msb_sites), total=len(msb_sites)):
     c_loc = a.site_name
 
     # select brain area
-    if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
-    # if target_area not in a.brain_areas:
+    if target_area == 'ML':
+        if ('ML' not in a.brain_areas) and ('MF' not in a.brain_areas):
+            print(f'Not Correct Area, ignore {fname}.')
+            del a
+            gc.collect()
+            continue
+    elif target_area not in a.brain_areas:
         print(f'Not Correct Area, ignore {fname}.')
         del a
         gc.collect()
         continue
 
-    ok_cells = c_info[c_info.Ceiling_Index > (0.3 / 1.7)]
+    ok_cells = np.array(c_info[c_info.Ceiling_Index>(0.3/1.7)].Cell)
     all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
     if target_area == 'MSB' or target_area == 'ASB':
         tuned_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
     else:
         tuned_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
     selected_cells = np.intersect1d(ok_cells, tuned_cells)
+    selected_cells = selected_cells.astype('i4') 
     if selected_cells.size == 0:
         print('No Good Cells. Continue.')
         del a
@@ -146,7 +158,7 @@ sns.heatmap(plotable,center=0,cmap='bwr')
 
 #%% save all msb cells
 np.savez_compressed(
-    ot.Join(save_path, f'{target_area}_Cells_Metamer_Only.npz'),
+    ot.Join(save_path, f'{target_area}_Cells_Bubble.npz'),
     psth=all_matemer_resp,
     FOB=all_fob_resp,
     d_primes=all_d_primes,
@@ -160,7 +172,7 @@ acs = all_d_primes[all_d_primes.Category=='Face'].reset_index(drop=True)
 for i in range(len(acs)):
     cc_loc = acs.loc[i,'Loc']
     # if ('MD' in cc_loc) or ('Mao' in cc_loc):
-    if 'Mao' in cc_loc:
+    if 'Zhuang' in cc_loc:
         counter+=1
 print(len(acs))
 print(counter)
