@@ -62,11 +62,12 @@ for _, cloc in tqdm(enumerate(msb_sites), total=len(msb_sites)):
         continue
 
     ok_cells = c_info[c_info.Ceiling_Index > (0.3 / 1.7)]
+    all_cell_dps = a.Cell_FOB_DPrimes.pivot(index='Cell',columns='Category',values='D_Prime')
     if target_area == 'MSB' or target_area == 'ASB':
-        selected_cells = ok_cells[ok_cells.Best_Prefer == 'Body']
+        tuned_cells = np.array(all_cell_dps[all_cell_dps['Body']>0.5].index)
     else:
-        selected_cells = ok_cells[ok_cells.Best_Prefer == 'Face']
-    selected_cells = np.array(selected_cells[selected_cells.Best_D_Prime > 0.5].Cell)
+        tuned_cells = np.array(all_cell_dps[all_cell_dps['Face']>0.5].index)
+    selected_cells = np.intersect1d(ok_cells, tuned_cells)
     if selected_cells.size == 0:
         del a
         gc.collect()
