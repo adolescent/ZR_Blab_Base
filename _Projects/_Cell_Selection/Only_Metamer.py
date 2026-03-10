@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 
 # msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
-target_area = 'ML'
+target_area = 'AL'
 
 
 if (target_area == 'ASB') or (target_area == 'AL'):
@@ -53,6 +53,7 @@ all_metamer_resp_list = []
 all_fob_resp_list = []
 all_d_primes_list = []
 all_response_list = []
+all_ceiling_index_list = []
 expected_fob_n = 300
 
 for _, cloc in tqdm(enumerate(msb_sites), total=len(msb_sites)):
@@ -89,6 +90,7 @@ for _, cloc in tqdm(enumerate(msb_sites), total=len(msb_sites)):
         continue
 
     selected_resps = a.avr_psth[selected_cells, :, :]
+    all_ceiling_index_list.append(a.ceiling_index[selected_cells])
 
     # Metamer subset (kept as your original logic)
     if a.stimset == 'Metamer1072':
@@ -146,6 +148,7 @@ for arr in all_fob_resp_list:
 all_fob_resp = np.concatenate(normalized_fob_list, axis=0) if len(normalized_fob_list) else np.empty((0, 0, 0))
 all_d_primes = pd.concat(all_d_primes_list, ignore_index=True) if len(all_d_primes_list) else pd.DataFrame()
 all_response = pd.concat(all_response_list, ignore_index=True) if len(all_response_list) else pd.DataFrame()
+all_ceiling_index = np.concat(all_ceiling_index_list)
 
 if len(all_d_primes):
     all_d_primes['Cell_ID'] = all_d_primes.groupby(['Loc', 'Cell'], sort=False).ngroup()
@@ -163,7 +166,8 @@ np.savez_compressed(
     psth=all_matemer_resp,
     FOB=all_fob_resp,
     d_primes=all_d_primes,
-    response=all_response
+    response=all_response,
+    ceiling_index = all_ceiling_index
 )
 
 print(set(all_d_primes.Loc))
@@ -177,5 +181,9 @@ for i in range(len(acs)):
         counter+=1
 print(len(acs))
 print(counter)
+
+#%%
+
+
 
 
