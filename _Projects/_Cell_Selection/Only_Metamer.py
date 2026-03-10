@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 
 # msb_sites = ot.Get_File_Name(r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB','.joblib')
 save_path = r'E:\#Preprocessed_Data\Selected_Cells'
-target_area = 'ASB'
+target_area = 'ML'
 
 
 if (target_area == 'ASB') or (target_area == 'AL'):
