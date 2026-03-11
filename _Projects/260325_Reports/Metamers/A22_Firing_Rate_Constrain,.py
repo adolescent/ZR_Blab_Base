@@ -73,18 +73,17 @@ for i, brain_area in tqdm(enumerate(brain_areas)):
     Firing_Rate_Matrix = pd.concat([Firing_Rate_Matrix, add_df], ignore_index=True)
 
 #%%
-import numpy as np
 
 # Define color variations for each area and hue
 # HARD-CODED legend/plot order
 legend_area_order = ['MSB', 'ML', 'ASB', 'AL']
-area_colors_ani = {
+area_colors_inani = {
     'AL': '#0072B2',         # blue
     'ASB': '#258fc7',        # lighter/different blue
     'ML': '#005b90',         # darker blue
     'MSB': '#33aadd',        # another blue variant
 }
-area_colors_inani = {
+area_colors_ani = {
     'AL': '#D55E00',         # orange
     'ASB': '#d5742f',        # lighter/different orange
     'ML': '#b14500',         # darker orange

@@ -1,6 +1,6 @@
 '''
 
-
+Generate 2-way anova for img_index and overall.
 '''
 
 #%%
@@ -21,8 +21,9 @@ savepath = r'E:\#Preprocessed_Data\260305_Report_Data\Site_ANOVAs'
 
 # filename = r'Res50_Response.npz'
 # filename = r'Alex_Response.npz'
-filename = r'ML_Cells_Metamer_Only.npz'
-brain_area = 'ML'
+
+brain_area = 'AL'
+filename = fr'{brain_area}_Cells_Metamer_Only.npz'
 
 data = np.load(ot.Join(datafolder,filename))
 keys = list(data.keys())
