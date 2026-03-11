@@ -34,7 +34,7 @@ stim_infos['Img_Index'] = np.tile(np.arange(40), 5)
 stim_infos['Shuffle'] = np.repeat(np.arange(5), 40)
 stim_infos['Ani'] = stim_infos['Img_Index']<20
 #%% calculate each cell's response ratio of 
-Firing_Rate_Matrix = pd.DataFrame(columns=['Brain_Area', 'Cell', 'Baseline', 'Shuffle', 'Img_Index', 'Ratio', 'Ani'])
+Firing_Rate_Matrix = pd.DataFrame(columns=['Brain_Area', 'Cell', 'Baseline', 'Shuffle', 'Img_Index', 'Ratio', 'Raw_FR', 'Ani'])
 for i, brain_area in tqdm(enumerate(brain_areas)):
     c_filename = f'{brain_area}_Cells_Metamer_Only.npz'
     reader = np.load(ot.Join(datafolder, c_filename), allow_pickle=True)
@@ -68,10 +68,11 @@ for i, brain_area in tqdm(enumerate(brain_areas)):
         'Shuffle': stim_infos['Shuffle'].to_numpy()[cond].astype(int),
         'Img_Index': stim_infos['Img_Index'].to_numpy()[cond].astype(int),
         'Ratio': ratio.reshape(-1),
+        'Raw_FR': psth_avr.reshape(-1),
         'Ani': stim_infos['Ani'].to_numpy()[cond].astype(bool),
     })
     Firing_Rate_Matrix = pd.concat([Firing_Rate_Matrix, add_df], ignore_index=True)
-
+Firing_Rate_Matrix.to_parquet(ot.Join(savepath,'FR_Raw.parquet'))
 #%%
 
 # Define color variations for each area and hue
