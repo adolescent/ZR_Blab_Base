@@ -197,6 +197,7 @@ axes_hm[1].set_title(f'Inanimate ({", ".join(heatmap_areas)})')
 plt.tight_layout()
 plt.show()
 
+
 #%%
 ####################### Part2, decode shuffle level ########
 
@@ -427,50 +428,165 @@ decoding_shuffle_pooled_boot = pd.DataFrame(
     columns=['Area', 'Ani', 'Bootstrap', 'Correct_Rate'],
 )
 
-#%%
-### Visualize part ########
-# Barplot: pooled shuffle decoding correct rate, real vs bootstrap
+#%% ####################### Part3, Cross Img id decode ########
 
-plot_real = decoding_shuffle_pooled_cr.copy()
-plot_real['Source'] = 'Real'
+'''
+Cross-image decoding of shuffle level (0-4), ignoring animate/inanimate.
+For each Area, we compute a 40x40 matrix (Train_Img x Test_Img) of
+SVR-based decoding performance:
 
-plot_boot = decoding_shuffle_pooled_boot.groupby(['Area', 'Ani'], as_index=False)['Correct_Rate'].mean()
-plot_boot['Source'] = 'Bootstrap'
+- For train_img == test_img: 5-fold GroupKFold over repeats (as before).
+- For train_img != test_img: train on all 25 trials of train_img,
+  test on all 25 trials of test_img.
 
-plot_all = pd.concat([plot_real, plot_boot], ignore_index=True)
-ani_map = {1: 'Animate', 0: 'Inanimate'}
-plot_all['Ani_Label'] = plot_all['Ani'].map(ani_map)
-plot_all['Hue_Label'] = plot_all.apply(
-    lambda r: f"{r['Ani_Label']}" if r['Source'] == 'Real' else f"{r['Ani_Label']} (trap)",
-    axis=1,
+Performance metric: round predictions to 0..4 and take fraction correct (same as pooled decoding).
+'''
+
+rows_img_cross = []
+for area in tqdm(brain_sites, desc='Area_shuffle_cross_img'):
+    for train_img in range(N_IMG):
+        X_train, y_train = get_X_y_shuffle(area, train_img)
+        n_samples = len(y_train)
+        for test_img in range(N_IMG):
+            X_test, y_test = get_X_y_shuffle(area, test_img)
+            if train_img == test_img:
+                groups_rep = np.arange(n_samples) % N_REPEAT
+                gkf = GroupKFold(n_splits=N_FOLD)
+                svr = SVR(kernel='linear')
+                y_pred = cross_val_predict(svr, X_train, y_train, groups=groups_rep, cv=gkf)
+                y_true = y_train
+            else:
+                svr = SVR(kernel='linear').fit(X_train, y_train)
+                y_pred = svr.predict(X_test)
+                y_true = y_test
+
+            # Same metric as pooled decoding: discretize predictions, then fraction correct
+            y_pred_disc = np.rint(y_pred).clip(0, N_SHUFFLE - 1).astype(int)
+            cr = float((y_pred_disc == y_true.astype(int)).mean())
+            rows_img_cross.append(
+                {
+                    'Area': area,
+                    'Train_Img': int(train_img),
+                    'Test_Img': int(test_img),
+                    'Correct_Rate': cr,
+                }
+            )
+
+decoding_shuffle_img_cross_cr = pd.DataFrame(
+    rows_img_cross,
+    columns=['Area', 'Train_Img', 'Test_Img', 'Correct_Rate'],
 )
 
-palette = {
-    'Animate': 'tab:orange',
-    'Animate (trap)': '#ffcc8a',   # lighter orange
-    'Inanimate': 'tab:blue',
-    'Inanimate (trap)': '#8ab5ff', # lighter blue
+#%% Heatmaps of cross-image shuffle decoding (2x2 subplots for 4 areas)
+
+area_order = ['MSB', 'ML', 'ASB', 'AL']  # adjust order if needed
+
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+fig, axes = plt.subplots(2, 2, figsize=(9, 7), dpi=240, sharex=False, sharey=False)
+axes = axes.ravel()
+
+vmin, vmax = 0.0, 0.4
+im = None
+
+for ax, area in zip(axes, area_order):
+    df_area = decoding_shuffle_img_cross_cr.loc[decoding_shuffle_img_cross_cr['Area'] == area]
+    mat = df_area.pivot(index='Train_Img', columns='Test_Img', values='Correct_Rate')
+    # Ensure full 0..39 coverage even if some rows/cols are missing
+    mat = mat.reindex(index=range(N_IMG), columns=range(N_IMG))
+
+    im = sns.heatmap(
+        mat,
+        ax=ax,
+        center=0.2,
+        vmin=vmin,
+        vmax=vmax,
+        cbar=False,
+        xticklabels=False,
+        yticklabels=False,
+        square=True,
+    )
+
+    # Annotate Ani (0–19) and Inani (20–39) on both axes with 2 labels
+    ax.set_xticks([9.5, 29.5])
+    ax.set_xticklabels(['Ani', 'Inani'], rotation=0)
+    ax.set_yticks([9.5, 29.5])
+    ax.set_yticklabels(['Ani', 'Inani'], rotation=90)
+    ax.plot([0, 40], [20, 20], linestyle='--', color='yellow', zorder=9)
+    ax.plot([20, 20], [0, 40], linestyle='--', color='yellow', zorder=9)
+    ax.set_title(area)
+
+# Only outer labels: bottom row x-labels, top row y-labels
+for i, ax in enumerate(axes):
+    row, col = divmod(i, 2)
+    # x-labels only on bottom row (row == 1)
+    if row == 1:
+        ax.set_xlabel('Test image group')
+    else:
+        ax.set_xlabel('')
+    # y-labels only on top row (row == 0)
+    if col == 0:
+        ax.set_ylabel('Train image group')
+    else:
+        ax.set_ylabel('')
+
+# Shared colorbar on the right (use all axes so sizes stay matched)
+if im is not None:
+    cbar = fig.colorbar(im.collections[0], ax=axes, location='right', fraction=0.1, pad=0.04)
+    cbar.set_label('Correct Rate')
+
+# plt.tight_layout()
+plt.show()
+#%%
+#%% Boxplot: cross-image decoding by Ani/Inani train/test pairing
+
+df_box = decoding_shuffle_img_cross_cr.copy()
+df_box = df_box[df_box.Test_Img != df_box.Train_Img]
+# Define Ani/Inani for train and test images
+df_box['Train_Ani'] = df_box['Train_Img'] < 20
+df_box['Test_Ani'] = df_box['Test_Img'] < 20
+
+def _pair_label(row):
+    if row['Train_Ani'] and row['Test_Ani']:
+        return 'Ani → Ani'
+    if (not row['Train_Ani']) and (not row['Test_Ani']):
+        return 'Inani → Inani'
+    if row['Train_Ani'] and (not row['Test_Ani']):
+        return 'Ani → Inani'
+    if (not row['Train_Ani']) and row['Test_Ani']:
+        return 'Inani → Ani'
+    return None
+
+df_box['Pair_Label'] = df_box.apply(_pair_label, axis=1)
+
+# Desired x order: ['Ani → Ani', 'Inani → Inani', 'Ani → Inani', 'Inani → Ani']
+x_order = ['Ani → Ani', 'Inani → Inani', 'Ani → Inani', 'Inani → Ani']
+
+palette_pairs = {
+    'MSB': 'tab:orange',
+    'ML': '#ffcc8a',
+    'ASB': '#8ab5ff',
+    'AL': 'tab:blue',
 }
 
-fig_bp, ax_bp = plt.subplots(figsize=(5, 4), dpi=240)
-sns.barplot(
-    data=plot_all,
-    x='Area',
+fig_pair, ax_pair = plt.subplots(figsize=(6, 5), dpi=240)
+sns.boxplot(
+    data=df_box,
+    x='Pair_Label',
     y='Correct_Rate',
-    hue='Hue_Label',
-    palette=palette,
-    ax=ax_bp,
-    dodge=True,
-    errorbar=('ci', 95),
+    hue='Area',
+    order=x_order,
+    palette=palette_pairs,
+    whis=(5, 95),
+    showfliers=False,
+    ax=ax_pair,
 )
-ax_bp.set_ylabel('Correct rate',fontsize=13,labelpad=5)
-ax_bp.set_xlabel('Brain Area',fontsize=13,labelpad=5)
-ax_bp.set_title('Pooled shuffle-level decoding ')
-ax_bp.legend(title='Condition', fontsize=8,title_fontsize=10)
-ax_bp.set_ylim(0, 1.05)
+ax_pair.set_xlabel('Train → Test',fontsize=15, fontweight='bold')
+ax_pair.set_ylabel('Correct Rate',fontsize=15, fontweight='bold')
+ax_pair.set_title('Cross-image decoding')
+ax_pair.legend(title='Condition', fontsize=8,title_fontsize=10)
+ax_pair.axhline(0.2,linestyle='--',color='gray',alpha=0.5,lw=1.3)
 plt.tight_layout()
 plt.show()
 
-
-
-
+# %%
