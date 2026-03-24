@@ -94,10 +94,10 @@ class Single_Recording_Site(object):
     def Noise_Ceiling(self,method='all'): # keep an api for further possible alter.
 
         if method == 'all':
-            self.ceiling_index = odd_end_ceiling(self.raw_psth,used_time=self.used_on)
+            self.ceiling_index,_,_ = all_split_half_ceiling(self.raw_psth,used_time=self.used_on)
         elif method =='fob':
             fob_parts =  self.stim_info[self.stim_info['Stim_Set'].str.contains('FOB', na=False)].index.tolist()
-            self.ceiling_index = odd_end_ceiling(self.raw_psth[:,:,fob_parts,:],used_time=self.used_on)
+            self.ceiling_index,_,_ = all_split_half_ceiling(self.raw_psth[:,:,fob_parts,:],used_time=self.used_on)
 
 
         # return ok cell id and cell index.

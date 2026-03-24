@@ -4,6 +4,7 @@ These functions are used for spike data processing.
 
 
 import numpy as np
+import itertools
 import h5py
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -140,6 +141,57 @@ def odd_end_ceiling(fob_dataset,used_time = np.arange(150,250)):
 
 
     return ceiling_index
+    
+
+def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250)):
+    '''
+    Calculate split-half ceiling using all possible half-splits across repeats.
+
+    fob_dataset must be shape:
+    (N_cell, N_repeat, N_FOB, N_Timepoint)
+
+    Steps:
+    1) Sum spikes in used_time to get onset response.
+    2) Enumerate all combinations of half repeats.
+       (For 4 repeats: C(4,2)=6 combinations, matching your example.)
+    3) For each combination, correlate mean(half A) vs mean(half B) for each cell.
+    4) Average r across combinations, then Spearman-Brown correction:
+       r_corr = 2r/(1+r)
+    '''
+    n_cell, n_repeat = fob_dataset.shape[0], fob_dataset.shape[1]
+    if n_repeat < 2:
+        raise ValueError('Need at least 2 repeats for split-half ceiling.')
+    if n_repeat % 2 != 0:
+        raise ValueError('Split-half requires even repeat count (N_repeat must be even).')
+
+    half_n = n_repeat // 2
+    repeat_ids = np.arange(n_repeat)
+    split_combos = list(itertools.combinations(repeat_ids, half_n))
+
+    fob_onset = fob_dataset[:, :, :, used_time].sum(-1)  # (N_cell, N_repeat, N_FOB)
+    all_r = np.full((n_cell, len(split_combos)), np.nan, dtype=float)
+
+    for k, combo in enumerate(split_combos):
+        combo = np.array(combo, dtype=int)
+        other = np.setdiff1d(repeat_ids, combo, assume_unique=True)
+        half_a = fob_onset[:, combo, :].mean(1)
+        half_b = fob_onset[:, other, :].mean(1)
+
+        for i in range(n_cell):
+            c_r, _ = stats.pearsonr(half_a[i, :], half_b[i, :])
+            all_r[i, k] = c_r
+
+    mean_r = np.nanmean(all_r, axis=1)
+    denom = 1.0 + mean_r
+    corr_ceiling = np.full_like(mean_r, np.nan)
+    valid = np.abs(denom) > 1e-12
+    corr_ceiling[valid] = 2.0 * mean_r[valid] / denom[valid]
+
+    mean_r = np.nan_to_num(mean_r)
+    corr_ceiling = np.nan_to_num(corr_ceiling)
+    return corr_ceiling, mean_r, all_r
+
+
     
 
 def Redplot(raw_data,base=np.arange(75,125),onset = np.arange(160,320)):
