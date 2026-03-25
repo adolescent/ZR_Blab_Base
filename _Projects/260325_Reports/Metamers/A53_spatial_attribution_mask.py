@@ -16,6 +16,7 @@ from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image, ImageFilter
 
 warnings.filterwarnings('ignore')
 
@@ -181,7 +182,7 @@ def build_spatial_attribution_bundle(
     fit_indices=None,
     ridge_alpha=1,
     metamer_suffix='_Cells_Bubble',
-    conv5_npz=CONV5_NPZ,
+    conv5_npz=CONV5_NPZ,conv5_key=CONV5_KEY,
     save_path=None,
     save_coefs=True,
 ):
@@ -194,7 +195,7 @@ def build_spatial_attribution_bundle(
         fit_indices = default_raw_ani_ids()
 
     fit_indices = np.asarray(fit_indices, dtype=int)
-    back_rsp = load_conv5_backbone(datafolder, conv5_npz, CONV5_KEY)
+    back_rsp = load_conv5_backbone(datafolder, conv5_npz, conv5_key)
     metamer_rsp = load_metamer_responses(datafolder, brain_sites, metamer_suffix)
     scaler_mean, scaler_std = scaler_mean_std_for_locations(back_rsp, fit_indices)
 
@@ -411,8 +412,13 @@ def plot_contribution_maps(maps_dict, summary_df=None, cmap='vlag', center=0.0, 
 
 #%% main: build bundle (uncomment to run)
 if __name__ == '__main__':
+    ## CORE BUILD PART
+    DATAFOLDER = r'E:\#Preprocessed_Data\Selected_Cells'
+    CONV5_NPZ = 'Alex_conv5_unpooled.npz'
+    CONV5_KEY = 'conv5_unpooled'
+    SAVE_NAME = 'spatial_attribution_Fig3.npz'
     bundle, path = build_spatial_attribution_bundle(
-        datafolder=DATAFOLDER,brain_sites=['ASB'],fit_indices=default_raw_ani_ids(shuffle_levels=[0,1,2,3,4],img_min=1,img_max=40),
+        datafolder=DATAFOLDER,brain_sites=['MSB','ML','ASB','AL'],metamer_suffix='_Cells_Metamer_Cut_Only',fit_indices=default_raw_ani_ids(shuffle_levels=[0,1,2,3,4],img_min=1,img_max=40),conv5_npz='Alex_Response_conv5_Notpool.npz',conv5_key='conv5_unpooled',
         ridge_alpha=1000,
         save_path=ot.Join(r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles', SAVE_NAME),
     )
@@ -420,7 +426,7 @@ if __name__ == '__main__':
     bundle_path = r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles\spatial_attribution_Fig3.npz'
     store = SpatialAttributionStore.load(bundle_path)
     site = 'ASB'
-    cell_id = 210
+    cell_id = 17
     fig3_mask = store.get_mask(site, cell_id)
 
     sns.set_theme(style="white", context="notebook")
@@ -432,12 +438,12 @@ if __name__ == '__main__':
         cbar_kws={"label": "Adj. R²"},
         linewidths=0,
     )
-    plt.title("Adj. R² mask (Fig. 3 style)")
-    plt.xlabel("conv5 j")
-    plt.ylabel("conv5 i")
+    # plt.title("Adj. R² mask (Fig. 3 style)")
+    # plt.xlabel("conv5 j")
+    # plt.ylabel("conv5 i")
     plt.tight_layout()
     plt.show()
-#%%
+#%% ### Plot contribution map
     # Example: compare per-image contribution maps for one neuron
     back_rsp = load_conv5_backbone(DATAFOLDER)
     store.attach_backbone(back_rsp)
@@ -447,6 +453,245 @@ if __name__ == '__main__':
     plot_contribution_maps(maps, summary_df=summary, cmap='vlag', ncols=3)
     plt.show()
 
-#%% Then I want to mask each cell's 
-all_img_path = ot.Get_File_Name(r'E:\#Stimsets\Metamer_P4_C4321_Object_STI150_1300','.jpg')[:1000]
+#%% Single cell masked images.
+    all_img_path = ot.Get_File_Name(r'E:\#Stimsets\Metamer_P4_C4321_Object_STI150_1300','.jpg')[:1000]
+
+    #%% top-k masked images by cell response
+    def binary_mask_top_percent(mask_13x13, keep_ratio=0.2):
+        """
+        Binarize adj-R2 mask and keep top keep_ratio pixels (default 20%).
+        Returns uint8 mask in {0,1} shape (13,13).
+        """
+        m = np.asarray(mask_13x13, dtype=float)
+        if not (0 < keep_ratio <= 1):
+            raise ValueError('keep_ratio must be in (0,1].')
+        thr = np.quantile(m, 1 - keep_ratio)
+        return (m >= thr).astype(np.uint8)
+
+
+    def keep_connected_components(bin_mask_13x13, min_component_size=3, connectivity=4, keep_mode='all'):
+        """
+        Remove small connected components from a binary mask.
+
+        Args:
+            bin_mask_13x13: uint8/boolean mask in {0,1}, shape (13,13)
+            min_component_size: minimum number of pixels in a component to keep
+            connectivity: 4 or 8
+            keep_mode: 'all' -> keep every component with size>=min_component_size
+                    'largest' -> keep only the largest component (after filtering)
+        """
+        m = (np.asarray(bin_mask_13x13) > 0).astype(np.uint8)
+        if m.ndim != 2:
+            raise ValueError('bin_mask_13x13 must be 2D.')
+        H, W = m.shape
+        if connectivity == 4:
+            nbrs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        elif connectivity == 8:
+            nbrs = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+        else:
+            raise ValueError("connectivity must be 4 or 8.")
+
+        visited = np.zeros((H, W), dtype=bool)
+        out = np.zeros((H, W), dtype=np.uint8)
+        best_coords = None
+        best_size = -1
+
+        for y in range(H):
+            for x in range(W):
+                if m[y, x] == 0 or visited[y, x]:
+                    continue
+                # BFS for one component
+                q = [(y, x)]
+                visited[y, x] = True
+                coords = [(y, x)]
+                qi = 0
+                while qi < len(q):
+                    cy, cx = q[qi]
+                    qi += 1
+                    for dy, dx in nbrs:
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < H and 0 <= nx < W and (not visited[ny, nx]) and m[ny, nx] == 1:
+                            visited[ny, nx] = True
+                            q.append((ny, nx))
+                            coords.append((ny, nx))
+
+                comp_size = len(coords)
+                if comp_size < int(min_component_size):
+                    continue
+                if keep_mode == 'all':
+                    for (yy, xx) in coords:
+                        out[yy, xx] = 1
+                elif keep_mode == 'largest':
+                    if comp_size > best_size:
+                        best_size = comp_size
+                        best_coords = coords
+                else:
+                    raise ValueError("keep_mode must be 'all' or 'largest'.")
+
+        if keep_mode == 'largest' and best_coords is not None:
+            for (yy, xx) in best_coords:
+                out[yy, xx] = 1
+
+        return out
+
+
+    def topk_img_ids_for_cell_response(metamer_rsp_site, cell_id, k=20, descending=True):
+        """
+        metamer_rsp_site: (N_cell, 1000)
+        Return top-k img ids ranked by this cell response.
+        """
+        rsp = np.asarray(metamer_rsp_site[cell_id], dtype=float).ravel()
+        order = np.argsort(rsp)
+        if descending:
+            order = order[::-1]
+        k = int(min(max(1, k), rsp.size))
+        return order[:k], rsp[order[:k]]
+
+
+    def resize_mask_to_image(mask_13x13, out_hw, mode='bicubic', blur_radius=1.2):
+        """
+        Resize 13x13 mask to (H,W) with interpolation and optional blur.
+
+        mode: 'nearest' | 'bilinear' | 'bicubic'
+        blur_radius: Gaussian blur radius after resize (0 disables blur).
+        """
+        h, w = int(out_hw[0]), int(out_hw[1])
+        m = np.clip(mask_13x13.astype(np.float32), 0.0, 1.0)
+        pil = Image.fromarray((m * 255).astype(np.uint8))
+        resample_map = {
+            'nearest': Image.NEAREST,
+            'bilinear': Image.BILINEAR,
+            'bicubic': Image.BICUBIC,
+        }
+        if mode not in resample_map:
+            raise ValueError("mode must be one of ['nearest', 'bilinear', 'bicubic']")
+        pil = pil.resize((w, h), resample=resample_map[mode])
+        if blur_radius is not None and float(blur_radius) > 0:
+            pil = pil.filter(ImageFilter.GaussianBlur(radius=float(blur_radius)))
+        m = np.asarray(pil, dtype=np.float32) / 255.0
+        return m
+
+
+    def masked_topk_images_for_cell(
+        store,
+        metamer_rsp_site,
+        site,
+        cell_id,
+        all_img_path,
+        k=20,
+        keep_ratio=0.2,
+        out_size=(224, 224),
+        min_component_size=3,
+        keep_mode='all',
+        smooth_mode='bicubic',
+        smooth_blur_radius=1.2,
+    ):
+        """
+        Build masked images for top-k activating images of one cell.
+        Returns:
+            out: dict with keys:
+                img_ids, responses, binary_mask_13x13, masked_imgs_uint8 (k,H,W,3), orig_imgs_uint8 (k,H,W,3)
+        """
+        fig3_mask = store.get_mask(site, cell_id)
+        bin13 = binary_mask_top_percent(fig3_mask, keep_ratio=keep_ratio)
+        bin13 = keep_connected_components(
+            bin13,
+            min_component_size=min_component_size,
+            connectivity=4,
+            keep_mode=keep_mode,
+        )
+        top_ids, top_rsp = topk_img_ids_for_cell_response(metamer_rsp_site, cell_id, k=k, descending=True)
+
+        orig_list, masked_list = [], []
+        for img_id in top_ids:
+            img = Image.open(all_img_path[int(img_id)]).convert('RGB')
+            if out_size is not None:
+                img = img.resize((out_size[1], out_size[0]), resample=Image.BILINEAR)
+            arr = np.asarray(img, dtype=np.uint8)
+            mask_hw = resize_mask_to_image(
+                bin13,
+                arr.shape[:2],
+                mode=smooth_mode,
+                blur_radius=smooth_blur_radius,
+            )[..., None]
+            masked = (arr.astype(np.float32) * mask_hw).clip(0, 255).astype(np.uint8)
+            orig_list.append(arr)
+            masked_list.append(masked)
+
+        return {
+            'img_ids': np.asarray(top_ids, dtype=int),
+            'responses': np.asarray(top_rsp, dtype=float),
+            'binary_mask_13x13': bin13,
+            'orig_imgs_uint8': np.stack(orig_list, axis=0),
+            'masked_imgs_uint8': np.stack(masked_list, axis=0),
+        }
+
+
+    def visualize_mask_and_topk(mask_pack, max_show=12):
+        """Visualize binary mask and top-k masked images."""
+        img_ids = mask_pack['img_ids']
+        rsps = mask_pack['responses']
+        orig = mask_pack['orig_imgs_uint8']
+        masked = mask_pack['masked_imgs_uint8']
+        bin13 = mask_pack['binary_mask_13x13']
+
+        sns.set_theme(style='white')
+        plt.figure(figsize=(4.2, 3.8))
+        sns.heatmap(bin13, cmap='gray_r', square=True, cbar=False, linewidths=0)
+        plt.title('Binary mask (top 20% adj-R2)')
+        plt.xlabel('conv5 j')
+        plt.ylabel('conv5 i')
+        plt.tight_layout()
+        plt.show()
+
+        n = int(min(len(img_ids), max_show))
+        fig, axes = plt.subplots(2, n, figsize=(2.3 * n, 4.8))
+        if n == 1:
+            axes = np.asarray(axes).reshape(2, 1)
+        for i in range(n):
+            axes[0, i].imshow(orig[i])
+            axes[0, i].set_title(f'img={img_ids[i]}\nrsp={rsps[i]:.3f}')
+            axes[0, i].axis('off')
+            axes[1, i].imshow(masked[i])
+            axes[1, i].set_title('masked')
+            axes[1, i].axis('off')
+        fig.suptitle('Top-k activating images (original vs masked)', y=1.02)
+        plt.tight_layout()
+        plt.show()
+
+
+    def save_masked_matrix(mask_pack, save_path):
+        """
+        Save masked-image matrix and metadata.
+        masked_imgs_uint8 shape: (k, H, W, 3)
+        """
+        np.savez_compressed(
+            save_path,
+            img_ids=mask_pack['img_ids'],
+            responses=mask_pack['responses'],
+            binary_mask_13x13=mask_pack['binary_mask_13x13'],
+            masked_imgs_uint8=mask_pack['masked_imgs_uint8'],
+            orig_imgs_uint8=mask_pack['orig_imgs_uint8'],
+        )
+        print(f'Saved masked matrix: {save_path}')
+
+    #%%
+    # Example usage:
+    cell_id = 17
+    metamer_rsp = load_metamer_responses(DATAFOLDER, [site])
+    pack = masked_topk_images_for_cell(
+        store,
+        metamer_rsp_site=metamer_rsp[site],
+        site=site,
+        cell_id=cell_id,
+        all_img_path=all_img_path,
+        k=7,              # adjustable
+        keep_ratio=0.2,    # top 20% binary mask
+        out_size=(224,224),
+        smooth_mode='bilinear',
+        smooth_blur_radius=3,min_component_size=3,
+    )
+    visualize_mask_and_topk(pack, max_show=20)
+    # save_masked_matrix(pack, ot.Join(r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles', f'{site}_cell{cell_id}_topk_masked.npz'))
+
 
