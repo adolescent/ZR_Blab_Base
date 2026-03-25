@@ -579,7 +579,7 @@ sns.boxplot(
     palette=palette_pairs,
     whis=(5, 95),
     showfliers=False,
-    ax=ax_pair,
+    ax=ax_pair,width=0.55,
 )
 ax_pair.set_xlabel('Train → Test',fontsize=15, fontweight='bold')
 ax_pair.set_ylabel('Correct Rate',fontsize=15, fontweight='bold')
@@ -589,4 +589,4 @@ ax_pair.axhline(0.2,linestyle='--',color='gray',alpha=0.5,lw=1.3)
 plt.tight_layout()
 plt.show()
 
-# %%
+
