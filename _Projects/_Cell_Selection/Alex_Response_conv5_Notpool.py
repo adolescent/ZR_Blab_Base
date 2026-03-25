@@ -15,12 +15,12 @@ from torchvision.models.feature_extraction import create_feature_extractor
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-all_filename = ot.Get_File_Name(r'E:\#Stimsets\Metamer_P4_C4321_Object_STI150_1300')
+all_filename = ot.Get_File_Name(r'E:\#Stimsets\NSD1000','.bmp')
 savepath = r'E:\#Preprocessed_Data\Selected_Cells'
 all_filename.sort()
-all_metamer_filepath = all_filename[:1000]
+all_metamer_filepath = all_filename
 
-
+#%%
 class ImageDataset(Dataset):
     def __init__(self, image_paths):
         self.image_paths = image_paths
@@ -68,4 +68,4 @@ np.savez_compressed(save_filename, conv5_unpooled=matrix_conv5)
 print(f"Saved: {save_filename}")
 print(f"conv5_unpooled shape: {matrix_conv5.shape}")
 #%%
-np.savez_compressed(ot.Join(savepath,'Alex_Response_conv5_unpooled'), conv5_unpooled=matrix_conv5)
+np.savez_compressed(ot.Join(savepath,'Alex_Response_conv5_unpooled_nsd'), conv5_unpooled=matrix_conv5)
