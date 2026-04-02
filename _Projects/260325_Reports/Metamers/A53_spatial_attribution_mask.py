@@ -414,19 +414,22 @@ def plot_contribution_maps(maps_dict, summary_df=None, cmap='vlag', center=0.0, 
 if __name__ == '__main__':
     ## CORE BUILD PART
     DATAFOLDER = r'E:\#Preprocessed_Data\Selected_Cells'
-    CONV5_NPZ = 'Alex_conv5_unpooled.npz'
+    CONV5_NPZ = 'Alex_Response_conv5_unpooled_nsd.npz'
     CONV5_KEY = 'conv5_unpooled'
-    SAVE_NAME = 'spatial_attribution_Fig3.npz'
+    SAVE_NAME = 'spatial_attribution_Fig3_NSD_1k.npz'
     bundle, path = build_spatial_attribution_bundle(
-        datafolder=DATAFOLDER,brain_sites=['MSB','ML','ASB','AL'],metamer_suffix='_Cells_Metamer_Cut_Only',fit_indices=default_raw_ani_ids(shuffle_levels=[0,1,2,3,4],img_min=1,img_max=40),conv5_npz='Alex_Response_conv5_Notpool.npz',conv5_key='conv5_unpooled',
+        datafolder=DATAFOLDER,brain_sites=['MSB'],metamer_suffix='_NSD_Demo_Part',
+        # fit_indices=default_raw_ani_ids(shuffle_levels=[0,1,2,3,4],img_min=1,img_max=40),
+        fit_indices=np.arange(1000),
+        conv5_npz=CONV5_NPZ,conv5_key=CONV5_KEY,
         ridge_alpha=1000,
         save_path=ot.Join(r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles', SAVE_NAME),
     )
 #%% show example
-    bundle_path = r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles\spatial_attribution_Fig3.npz'
+    bundle_path = r'E:\#Preprocessed_Data\260305_Report_Data\Bubbles\spatial_attribution_Fig3_NSD_1k.npz'
     store = SpatialAttributionStore.load(bundle_path)
-    site = 'ASB'
-    cell_id = 17
+    site = 'MSB'
+    cell_id = 73
     fig3_mask = store.get_mask(site, cell_id)
 
     sns.set_theme(style="white", context="notebook")
@@ -454,9 +457,9 @@ if __name__ == '__main__':
     plt.show()
 
 #%% Single cell masked images.
-    all_img_path = ot.Get_File_Name(r'E:\#Stimsets\Metamer_P4_C4321_Object_STI150_1300','.jpg')[:1000]
-
-    #%% top-k masked images by cell response
+    # all_img_path = ot.Get_File_Name(r'E:\#Stimsets\Metamer_P4_C4321_Object_STI150_1300','.jpg')[:1000]
+    all_img_path = ot.Get_File_Name(r'E:\#Stimsets\NSD1000','.bmp')[:1000]
+    # top-k masked images by cell response
     def binary_mask_top_percent(mask_13x13, keep_ratio=0.2):
         """
         Binarize adj-R2 mask and keep top keep_ratio pixels (default 20%).
@@ -677,7 +680,7 @@ if __name__ == '__main__':
 
     #%%
     # Example usage:
-    cell_id = 17
+    cell_id = 73
     metamer_rsp = load_metamer_responses(DATAFOLDER, [site])
     pack = masked_topk_images_for_cell(
         store,

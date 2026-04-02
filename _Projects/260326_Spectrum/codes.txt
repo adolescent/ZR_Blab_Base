@@ -1,0 +1,445 @@
+% 251110_Simple_Spectrogram_Analysis.m
+% 简化版脑电时频分析 - 使用多锥形谱分析，输出dB单位
+
+clear; close all; clc;
+
+%% ==== 1. 加载数据 ====
+fprintf('=== 简单时频分析 - 整体脑电变化 ===\n');
+
+input_filepath = 'E:\#Preprocessed_Data\Others\260326_Spectrum';
+input_filename = 'EEG_processed_data.mat';
+
+try
+    load(fullfile(input_filepath, input_filename));
+    eeg_signal = ProcessedEEG.eeg_final;      % 滤波后的EEG信号
+    Fs = ProcessedEEG.Fs_processed;           % 采样率 (1000 Hz)
+    t_vector = ProcessedEEG.t_1000hz;         % 时间向量
+    
+    fprintf('✅ 数据加载成功\n');
+    fprintf('信号长度: %d 点, 时长: %.1f 秒\n', length(eeg_signal), t_vector(end));
+    
+catch ME
+    fprintf('❌ 数据加载失败: %s\n', ME.message);
+    return;
+end
+
+%% ==== 2. 使用多锥形谱分析计算时频谱图 ====
+fprintf('\n=== 计算多锥形谱时频谱图 ===\n');
+
+% 多锥形谱参数
+window_size = 4;        % 4秒窗口 (与文献一致)
+overlap = 0.5;          % 50%重叠
+tapers = 5;             % 5个锥形窗口
+freq_range = [0.5, 50]; % 频率范围
+
+fprintf('使用多锥形谱分析:\n');
+fprintf('• 窗口大小: %.1f 秒\n', window_size);
+fprintf('• 重叠: %.0f%%\n', overlap*100);
+fprintf('• 锥形窗口数: %d\n', tapers);
+fprintf('• 频率范围: %.1f-%.1f Hz\n', freq_range);
+
+% 计算时频谱图
+[spectrogram_matrix, freq_vector, time_vector] = compute_multitaper_spectrogram_fixed(...
+    eeg_signal, Fs, window_size, overlap, tapers, freq_range);
+
+fprintf('✅ 时频谱图计算完成\n');
+fprintf('时间点: %d, 频率点: %d\n', length(time_vector), length(freq_vector));
+
+%% ==== 3. 计算整体功率指标 ====
+fprintf('\n=== 计算整体功率指标 ===\n');
+
+% 总功率时程 (在指定频率范围内)
+freq_mask = freq_vector >= freq_range(1) & freq_vector <= freq_range(2);
+total_power = sum(spectrogram_matrix(:, freq_mask), 2);
+
+% 中值频率时程 (反映频谱重心)
+median_freq = zeros(length(time_vector), 1);
+for i = 1:length(time_vector)
+    current_spectrum = spectrogram_matrix(i, freq_mask);
+    current_freq = freq_vector(freq_mask);
+    cumulative_power = cumsum(current_spectrum);
+    total_power_point = cumulative_power(end);
+    if total_power_point > 0
+        median_idx = find(cumulative_power >= total_power_point/2, 1);
+        if ~isempty(median_idx)
+            median_freq(i) = current_freq(median_idx);
+        end
+    end
+end
+
+% 峰值频率时程 (功率最大的频率)
+[~, peak_freq_idx] = max(spectrogram_matrix(:, freq_mask), [], 2);
+peak_freq = freq_vector(freq_mask);
+peak_freq = peak_freq(peak_freq_idx)';
+
+fprintf('✅ 整体功率指标计算完成\n');
+
+%% ==== 3.5 转换为dB单位 ====
+fprintf('\n=== 转换为dB单位 ===\n');
+
+% 将功率转换为dB: dB = 10 * log10(power)
+spectrogram_dB = 10 * log10(spectrogram_matrix);
+total_power_dB = 10 * log10(total_power);
+
+fprintf('功率单位已转换为dB\n');
+fprintf('时频谱图范围: %.1f 到 %.1f dB\n', min(spectrogram_dB(:)), max(spectrogram_dB(:)));
+fprintf('总功率范围: %.1f 到 %.1f dB\n', min(total_power_dB), max(total_power_dB));
+
+%% ==== 4. 可视化整体时频变化 (使用dB单位) ====
+fprintf('\n=== 生成可视化 (dB单位) ===\n');
+
+output_dir = 'H:\EEG_data\260320_17\processed_channels\simple_spectral_analysis\';
+if ~exist(output_dir, 'dir')
+    mkdir(output_dir);
+end
+
+% 限制显示的频率范围
+display_freq_mask = freq_vector >= 0.5 & freq_vector <= 40;
+display_freq = freq_vector(display_freq_mask);
+display_spectrogram_dB = spectrogram_dB(:, display_freq_mask)';
+
+% ============================================================
+% === 颜色条范围设置 - 在这里调整颜色对比度 ===
+% ============================================================
+% 您可以修改这两个值来调整颜色条的上下限
+dB_min_user = -25;    % 颜色条最小值 (dB)
+dB_max_user = 10;    % 颜色条最大值 (dB)
+
+user_dB_range = [dB_min_user, dB_max_user];
+fprintf('用户设置的颜色条范围: [%.1f, %.1f] dB\n', user_dB_range(1), user_dB_range(2));
+
+% 计算数据的实际范围供参考
+actual_dB_range = [min(display_spectrogram_dB(:)), max(display_spectrogram_dB(:))];
+fprintf('数据实际范围: [%.1f, %.1f] dB\n', actual_dB_range(1), actual_dB_range(2));
+
+% 检查用户设置是否合理
+if dB_min_user > actual_dB_range(1) || dB_max_user < actual_dB_range(2)
+    fprintf('⚠️  注意: 用户设置的范围可能截断部分数据\n');
+end
+
+% 图1: 三合一视图 - EEG信号 + 时频谱图(dB) + 总功率(dB)
+fig_main = figure('Position', [100, 100, 1400, 900]);
+
+% 子图1: 原始EEG信号
+subplot(4,1,1);
+plot(t_vector, eeg_signal, 'b', 'LineWidth', 0.8);
+title('原始EEG信号', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('幅值 (µV)');
+xlim([0 t_vector(end)]);
+grid on;
+
+% 子图2: 时频谱图 (dB单位) - 使用用户设置的颜色范围
+subplot(4,1,2);
+imagesc(time_vector, display_freq, display_spectrogram_dB);
+axis xy;
+colorbar;
+title(sprintf('时频谱图 (多锥形谱分析, dB单位) [%.0f, %.0f] dB', dB_min_user, dB_max_user), ...
+      'FontSize', 12, 'FontWeight', 'bold');
+ylabel('频率 (Hz)');
+xlim([0 t_vector(end)]);
+ylim([0 50]);
+caxis(user_dB_range);  % 使用用户设置的颜色范围
+
+% 子图3: 总功率时程 (dB)
+subplot(4,1,3);
+plot(time_vector, total_power_dB, 'r-', 'LineWidth', 2);
+title('总功率时程 (0.5-50 Hz, dB)', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('功率 (dB)');
+xlabel('时间 (s)');
+xlim([0 t_vector(end)]);
+grid on;
+
+% 子图4: 频率指标时程
+subplot(4,1,4);
+plot(time_vector, median_freq, 'g-', 'LineWidth', 2, 'DisplayName', '中值频率');
+hold on;
+plot(time_vector, peak_freq, 'm-', 'LineWidth', 2, 'DisplayName', '峰值频率');
+title('频率特征时程', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('频率 (Hz)');
+xlabel('时间 (s)');
+legend('Location', 'best');
+xlim([0 t_vector(end)]);
+grid on;
+
+sgtitle(sprintf('脑电整体时频特征分析 - 颜色范围[%.0f, %.0f] dB', dB_min_user, dB_max_user), ...
+        'FontSize', 14, 'FontWeight', 'bold');
+
+% 保存主图
+saveas(fig_main, fullfile(output_dir, 'overall_spectral_analysis_dB.png'));
+
+% 图2: 时频谱图详细视图 (dB) - 使用用户设置
+fig_spectrogram = figure('Position', [100, 100, 1600, 600]);
+
+% 使用更好的颜色映射
+h = imagesc(time_vector, display_freq, display_spectrogram_dB);
+axis xy;
+colormap(jet);
+colorbar;
+title(sprintf('脑电时频谱图 - 颜色范围[%.0f, %.0f] dB', dB_min_user, dB_max_user), ...
+      'FontSize', 14, 'FontWeight', 'bold');
+xlabel('时间 (s)');
+ylabel('频率 (Hz)');
+xlim([0 t_vector(end)]);
+ylim([0 40]);
+caxis(user_dB_range); % 使用用户设置的颜色范围
+
+% 修复图像显示范围，确保完全填充坐标轴
+% 获取图像对象的范围并调整
+xdata = get(h, 'XData');
+ydata = get(h, 'YData');
+
+% 如果图像范围与坐标轴范围不匹配，进行调整
+if length(xdata) == 2
+    % 扩展图像范围以确保完全填充
+    set(h, 'XData', [min(time_vector), max(time_vector)]);
+    set(h, 'YData', [min(display_freq), max(display_freq)]);
+end
+
+% 设置坐标轴属性以确保图像完全填充
+axis tight;  % 紧贴数据范围
+set(gca, 'Layer', 'top');  % 将坐标轴置于顶层
+
+% 添加颜色条标签
+c = colorbar;
+c.Label.String = '功率 (dB)';
+c.Label.FontSize = 12;
+
+% 添加网格便于观察
+grid on;
+
+% 保存时频谱图
+saveas(fig_spectrogram, fullfile(output_dir, 'detailed_spectrogram_dB.png'));
+
+% 同样修复对比图中的显示问题
+fig_comparison = figure('Position', [100, 100, 1600, 1000]);
+
+% 预定义几个常用的颜色范围选项
+color_ranges = [
+    -5,  15;   % 选项1: 宽范围
+    -2,  10;   % 选项2: 中等范围
+     0,  12;   % 选项3: 高对比度
+    -3,   8;   % 选项4: 窄范围
+    -8,  20    % 选项5: 很宽的范围
+];
+
+range_names = {'宽范围[-5,15]', '中等范围[-2,10]', '高对比[0,12]', '窄范围[-3,8]', '很宽范围[-8,20]'};
+
+for i = 1:size(color_ranges, 1)
+    subplot(2, 3, i);
+    
+    h_comp = imagesc(time_vector, display_freq, display_spectrogram_dB);
+    axis xy;
+    colorbar;
+    title(sprintf('%s dB', range_names{i}), 'FontSize', 11, 'FontWeight', 'bold');
+    xlabel('时间 (s)'); ylabel('频率 (Hz)');
+    caxis(color_ranges(i, :));
+    colormap(jet);
+    xlim([0 t_vector(end)]);
+    ylim([0 40]);
+    
+    % 修复每个子图的显示范围
+    set(h_comp, 'XData', [min(time_vector), max(time_vector)]);
+    set(h_comp, 'YData', [min(display_freq), max(display_freq)]);
+    axis tight;
+    set(gca, 'Layer', 'top');
+end
+
+% 最后一个子图显示实际数据范围
+subplot(2, 3, 6);
+h_actual = imagesc(time_vector, display_freq, display_spectrogram_dB);
+axis xy;
+colorbar;
+title(sprintf('实际范围[%.1f,%.1f] dB', actual_dB_range(1), actual_dB_range(2)), ...
+      'FontSize', 11, 'FontWeight', 'bold');
+xlabel('时间 (s)'); ylabel('频率 (Hz)');
+caxis(actual_dB_range);
+colormap(jet);
+xlim([0 t_vector(end)]);
+ylim([0 40]);
+
+% 修复最后一个子图的显示范围
+set(h_actual, 'XData', [min(time_vector), max(time_vector)]);
+set(h_actual, 'YData', [min(display_freq), max(display_freq)]);
+axis tight;
+set(gca, 'Layer', 'top');
+
+sgtitle('不同颜色范围对比', 'FontSize', 14, 'FontWeight', 'bold');
+saveas(fig_comparison, fullfile(output_dir, 'color_range_comparison.png'));
+
+% 同样修复主图中的时频谱图显示
+% 重新创建主图确保一致性
+close(fig_main);  % 关闭之前的主图
+
+fig_main = figure('Position', [100, 100, 1400, 900]);
+
+% 子图1: 原始EEG信号
+subplot(4,1,1);
+plot(t_vector, eeg_signal, 'b', 'LineWidth', 0.8);
+title('原始EEG信号', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('幅值 (µV)');
+xlim([0 t_vector(end)]);
+grid on;
+
+% 子图2: 时频谱图 (dB单位) - 修复显示范围
+subplot(4,1,2);
+h_main = imagesc(time_vector, display_freq, display_spectrogram_dB);
+axis xy;
+colorbar;
+title(sprintf('时频谱图 (多锥形谱分析, dB单位) [%.0f, %.0f] dB', dB_min_user, dB_max_user), ...
+      'FontSize', 12, 'FontWeight', 'bold');
+ylabel('频率 (Hz)');
+xlim([0 t_vector(end)]);
+ylim([0 40]);
+caxis(user_dB_range);
+
+% 修复主图中的显示范围
+set(h_main, 'XData', [min(time_vector), max(time_vector)]);
+set(h_main, 'YData', [min(display_freq), max(display_freq)]);
+axis tight;
+set(gca, 'Layer', 'top');
+
+% 子图3: 总功率时程 (dB)
+subplot(4,1,3);
+plot(time_vector, total_power_dB, 'r-', 'LineWidth', 2);
+title('总功率时程 (0.5-50 Hz, dB)', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('功率 (dB)');
+xlabel('时间 (s)');
+xlim([0 t_vector(end)]);
+grid on;
+
+% 子图4: 频率指标时程
+subplot(4,1,4);
+plot(time_vector, median_freq, 'g-', 'LineWidth', 2, 'DisplayName', '中值频率');
+hold on;
+plot(time_vector, peak_freq, 'm-', 'LineWidth', 2, 'DisplayName', '峰值频率');
+title('频率特征时程', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('频率 (Hz)');
+xlabel('时间 (s)');
+legend('Location', 'best');
+xlim([0 t_vector(end)]);
+grid on;
+
+sgtitle(sprintf('脑电整体时频特征分析 - 颜色范围[%.0f, %.0f] dB', dB_min_user, dB_max_user), ...
+        'FontSize', 14, 'FontWeight', 'bold');
+
+% 重新保存修复后的主图
+saveas(fig_main, fullfile(output_dir, 'overall_spectral_analysis_dB.png'));
+
+%% ==== 5. 保存简化结果 (包含dB数据) ====
+fprintf('\n=== 保存分析结果 ===\n');
+
+% 保存主要结果
+SimpleSpectralResults = struct();
+SimpleSpectralResults.spectrogram = spectrogram_matrix;      % 原始功率
+SimpleSpectralResults.spectrogram_dB = spectrogram_dB;       % dB功率
+SimpleSpectralResults.freq_vector = freq_vector;
+SimpleSpectralResults.time_vector = time_vector;
+SimpleSpectralResults.total_power = total_power;             % 原始总功率
+SimpleSpectralResults.total_power_dB = total_power_dB;       % dB总功率
+SimpleSpectralResults.median_frequency = median_freq;
+SimpleSpectralResults.peak_frequency = peak_freq;
+SimpleSpectralResults.analysis_params.window_size = window_size;
+SimpleSpectralResults.analysis_params.overlap = overlap;
+SimpleSpectralResults.analysis_params.tapers = tapers;
+SimpleSpectralResults.analysis_params.freq_range = freq_range;
+SimpleSpectralResults.user_color_range = user_dB_range;      % 保存用户设置的颜色范围
+SimpleSpectralResults.analysis_date = datestr(now);
+
+save(fullfile(output_dir, 'simple_spectral_results.mat'), 'SimpleSpectralResults', '-v7.3');
+
+fprintf('✅ 结果已保存到: %s\n', output_dir);
+
+%% ==== 6. 输出简要总结 (dB单位) ====
+fprintf('\n=== 分析总结 (dB单位) ===\n');
+
+fprintf('整体功率统计 (dB):\n');
+fprintf('• 平均总功率: %.1f dB\n', mean(total_power_dB));
+fprintf('• 功率范围: %.1f 到 %.1f dB\n', min(total_power_dB), max(total_power_dB));
+fprintf('• 功率标准差: %.1f dB\n', std(total_power_dB));
+fprintf('• 中值频率: %.1f ± %.1f Hz\n', mean(median_freq), std(median_freq));
+fprintf('• 峰值频率: %.1f ± %.1f Hz\n', mean(peak_freq), std(peak_freq));
+
+% 计算动态范围
+dynamic_range = max(total_power_dB) - min(total_power_dB);
+fprintf('• 功率动态范围: %.1f dB\n', dynamic_range);
+
+fprintf('\n颜色条设置信息:\n');
+fprintf('• 用户设置: [%.1f, %.1f] dB\n', dB_min_user, dB_max_user);
+fprintf('• 数据实际: [%.1f, %.1f] dB\n', actual_dB_range(1), actual_dB_range(2));
+fprintf('• 建议调整: 修改代码第90-91行的 dB_min_user 和 dB_max_user 值\n');
+
+fprintf('\n💡 调整建议:\n');
+fprintf('• 如果颜色对比度不足，尝试缩小范围 (如 [-2, 10])\n');
+fprintf('• 如果颜色过饱和，尝试扩大范围 (如 [-8, 20])\n');
+fprintf('• 查看 color_range_comparison.png 选择最合适的效果\n');
+
+%% ==== 修复的多锥形谱分析函数 ====
+function [spectrogram_matrix, freq_vector, time_vector] = compute_multitaper_spectrogram_fixed(signal, Fs, window_size, overlap, tapers, freq_range)
+    % 修复版多锥形谱时频谱图计算
+    
+    window_samples = round(window_size * Fs);
+    step_samples = round(window_size * (1-overlap) * Fs);
+    
+    total_samples = length(signal);
+    num_windows = floor((total_samples - window_samples) / step_samples) + 1;
+    
+    % 设置多锥形谱参数
+    params.Fs = Fs;
+    params.tapers = [3, 5]; % [时间带宽积, 锥形数] - 更稳定的设置
+    params.fpass = freq_range; % 频率范围
+    params.pad = 0; % 无填充
+    
+    fprintf('计算多锥形谱: ');
+    
+    % 先计算第一个窗口来确定频率向量长度
+    test_signal = signal(1:min(window_samples, length(signal)));
+    [temp_spectrum, temp_freq] = mtspectrumc(test_signal, params);
+    
+    freq_vector = temp_freq;
+    num_freq_bins = length(freq_vector);
+    
+    fprintf('频率点数: %d\n', num_freq_bins);
+    
+    % 初始化输出矩阵 - 现在我们知道确切大小了
+    spectrogram_matrix = zeros(num_windows, num_freq_bins);
+    time_vector = zeros(1, num_windows);
+    
+    for i = 1:num_windows
+        if mod(i, 20) == 0
+            fprintf('%d/%d...', i, num_windows);
+        end
+        
+        start_sample = (i-1) * step_samples + 1;
+        end_sample = start_sample + window_samples - 1;
+        
+        if end_sample > total_samples
+            break;
+        end
+        
+        % 提取当前窗口信号
+        window_signal = signal(start_sample:end_sample);
+        
+        % 多锥形谱计算
+        try
+            [power_spectrum, ~] = mtspectrumc(window_signal, params);
+            spectrogram_matrix(i, :) = power_spectrum';
+            time_vector(i) = (start_sample + end_sample) / (2 * Fs);
+        catch ME
+            fprintf('窗口 %d 计算失败: %s\n', i, ME.message);
+            % 用前一个窗口的值填充（如果可用）
+            if i > 1
+                spectrogram_matrix(i, :) = spectrogram_matrix(i-1, :);
+            else
+                spectrogram_matrix(i, :) = zeros(1, num_freq_bins);
+            end
+            time_vector(i) = (start_sample + end_sample) / (2 * Fs);
+        end
+    end
+    
+    fprintf('完成\n');
+    
+    % 输出调试信息
+    fprintf('频谱矩阵大小: %d x %d\n', size(spectrogram_matrix, 1), size(spectrogram_matrix, 2));
+    fprintf('频率向量大小: %d\n', length(freq_vector));
+    fprintf('时间向量大小: %d\n', length(time_vector));
+end
