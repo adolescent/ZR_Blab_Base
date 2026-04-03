@@ -48,7 +48,7 @@ c1_avr = cells_c1.mean(0)
 c2_avr = cells_c2.mean(0)
 
 #%% ##################### Analysis 1, calculate corr between shuffle levels.
-win_len = 20
+win_len = 10
 win_step = 5
 img_range = np.arange(9,10)
 
@@ -87,7 +87,9 @@ def corr_shuffle_time_windows(resp, trial_indices, img, shuf_a, shuf_b, wa, wb, 
     """resp: (n_cells, 1000, n_t) psth_pdf slice; window indices wa, wb relative to 0–300 ms slice."""
     idx_a = trial_indices[(int(img), int(shuf_a))]
     idx_b = trial_indices[(int(img), int(shuf_b))]
-    same = int(shuf_a) == int(shuf_b)
+    # Exclude self-pairs only when data are exactly same source: same shuffle and same window
+    # same = (int(shuf_a) == int(shuf_b)) and (int(wa) == int(wb))
+    same = False
     rs = []
     for ia, ib in iter_rep_pairs(same):
         v1 = resp[:, idx_a[ia], wa : wa + win_len].sum(axis=-1)
@@ -187,7 +189,7 @@ def plot_shuffle_timecorr_heatmap(
     plot_t_start_ms=None,
     plot_t_end_ms=None,
     figsize=(8, 8),
-    save_path=None,
+    save_path=None,vmax=1.0
 ):
     """Heatmap: x = window B start (ms), y = window A start (ms), value = corr_mean.
     Rows are flipped so smaller A is toward the bottom (Cartesian-style with time).
@@ -239,8 +241,8 @@ def plot_shuffle_timecorr_heatmap(
         ax=ax,
         cmap='coolwarm',
         center=0.0,
-        vmin=-1.0,
-        vmax=1.0,
+        vmin=-vmax,
+        vmax=vmax,
         square=True,
         xticklabels=_sparse_ms_labels(rel_b),
         yticklabels=_sparse_ms_labels(rel_a),
@@ -286,7 +288,7 @@ def plot_shuffle_timecorr_heatmap(
 plot_img_index = 9
 plot_shuffle_a = 0
 plot_shuffle_b = 0
-plot_cell_group = 'c0'
+plot_cell_group = 'c1'
 # If you run only this cell: load parquet (match win_len/step/filename used when saving):
 # shuffle_timecorr_df = pd.read_parquet(ot.Join(wp, f'{used_ares}_shuffle_timecorr_psth_pdf_win{win_len}_step{win_step}.parquet'))
 
@@ -303,9 +305,9 @@ if shuffle_timecorr_df is not None:
         cell_group=plot_cell_group,
         t_ms_offset=t_ms0,
         tick_ms_step=20,
-        # plot_t_start_ms=60,
-        # plot_t_end_ms=200,
-        save_path=None,
+        # plot_t_start_ms=40,
+        plot_t_end_ms=200,
+        save_path=None,vmax=0.3
     )
     plt.show()
 
