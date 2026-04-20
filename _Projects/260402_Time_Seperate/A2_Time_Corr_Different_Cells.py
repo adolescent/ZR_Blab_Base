@@ -24,7 +24,7 @@ wp= r'E:\#Preprocessed_Data\260402_TC_Analysis'
 
 #%% data loading and pre-processing.
 brain_areas = ['MSB','ASB','AL','ML']
-used_ares = brain_areas[0]
+used_ares = brain_areas[3]
 
 psths = np.load(ot.Join(datafolder,f'{used_ares}_Cells_Metamer_Only.npz'))['psth']
 
@@ -288,7 +288,7 @@ def plot_shuffle_timecorr_heatmap(
     return fig, ax
 
 
-plot_img_index = 1
+plot_img_index = 9
 plot_shuffle_a = 0
 plot_shuffle_b = 4
 plot_cell_group = 'c2'
@@ -450,5 +450,6 @@ fig_avg, ax_avg = plot_shuffle_timecorr_heatmap_mean_imgs(
     vmax=vmax,
 )
 plt.show()
+
 
 
