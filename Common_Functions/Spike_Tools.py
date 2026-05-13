@@ -143,7 +143,7 @@ def odd_end_ceiling(fob_dataset,used_time = np.arange(150,250)):
     return ceiling_index
     
 
-def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250)):
+def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250),max_iter=2000):
     '''
     Calculate split-half ceiling using all possible half-splits across repeats.
 
@@ -170,6 +170,12 @@ def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250)):
 
     fob_onset = fob_dataset[:, :, :, used_time].sum(-1)  # (N_cell, N_repeat, N_FOB)
     all_r = np.full((n_cell, len(split_combos)), np.nan, dtype=float)
+    if len(split_combos) > max_iter:
+        print(f'Combos number: {len(split_combos)} is too large, only use {max_iter} combos.')
+        # Randomly select max_iter unique split combos if exceeding max_iter
+        rng = np.random.default_rng()
+        split_combos = rng.choice(split_combos, size=max_iter, replace=False)
+
     print(f'Combos number: {len(split_combos)}')
     for k, combo in tqdm(enumerate(split_combos)):
         combo = np.array(combo, dtype=int)
