@@ -74,13 +74,14 @@ class Single_Recording_Site(object):
         self.raw_psth = PSTH_From_Goodunit(self.gn_dic,self.img_size,'dict')
         self.avr_psth = self.raw_psth.mean(1)
         ## 3. Noise ceiling, provide ceiling index.
+        print('Calculating Noise Ceiling...')
         self.Noise_Ceiling()
         ## 4. Redplots
         self.raw_redplot = self.avr_psth[:,:,self.used_on].sum(-1)
         ## 5.calculate cell tunings.
         print('Calculating Cell Tuning Info...')
         self.FOB_Tuning_Calculator()
-        ## 6. Final 
+        ## 6. Final info generation.
         print('Data processing done. Generating Overall info data frame...')
         self.Catable_Cell_Info_Generator()
 
