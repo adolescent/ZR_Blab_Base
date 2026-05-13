@@ -125,6 +125,8 @@ class Single_Recording_Site(object):
             stim_cats = ['Face','Body','Object','Scene','Food']
         elif 'FOB72' in fob_style:
             stim_cats = ['Face','Body','Object']
+        elif 'Wordloc' in fob_style:
+            stim_cats = ['body','face','presuletter','spiky','stubby','word']
         else:
             raise ValueError('FOB Method unsupported.')
         
