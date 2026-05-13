@@ -170,8 +170,8 @@ def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250)):
 
     fob_onset = fob_dataset[:, :, :, used_time].sum(-1)  # (N_cell, N_repeat, N_FOB)
     all_r = np.full((n_cell, len(split_combos)), np.nan, dtype=float)
-
-    for k, combo in enumerate(split_combos):
+    print(f'Combos number: {len(split_combos)}')
+    for k, combo in tqdm(enumerate(split_combos)):
         combo = np.array(combo, dtype=int)
         other = np.setdiff1d(repeat_ids, combo, assume_unique=True)
         half_a = fob_onset[:, combo, :].mean(1)
