@@ -152,8 +152,9 @@ def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250),max_iter=20
 
     Steps:
     1) Sum spikes in used_time to get onset response.
-    2) Enumerate all combinations of half repeats.
+    2) Enumerate all combinations of half repeats (smaller half has N_repeat//2 repeats).
        (For 4 repeats: C(4,2)=6 combinations, matching your example.)
+       If N_repeat is odd, the complement half has one extra repeat; a message is printed.
     3) For each combination, correlate mean(half A) vs mean(half B) for each cell.
     4) Average r across combinations, then Spearman-Brown correction:
        r_corr = 2r/(1+r)
@@ -161,10 +162,13 @@ def all_split_half_ceiling(fob_dataset, used_time=np.arange(150,250),max_iter=20
     n_cell, n_repeat = fob_dataset.shape[0], fob_dataset.shape[1]
     if n_repeat < 2:
         raise ValueError('Need at least 2 repeats for split-half ceiling.')
-    if n_repeat % 2 != 0:
-        raise ValueError('Split-half requires even repeat count (N_repeat must be even).')
 
     half_n = n_repeat // 2
+    if n_repeat % 2 != 0:
+        print(
+            f'all_split_half_ceiling: N_repeat={n_repeat} is odd — using unequal split '
+            f'({half_n} vs {n_repeat - half_n} repeats per half; Spearman-Brown unchanged).'
+        )
     repeat_ids = np.arange(n_repeat)
     split_combos = list(itertools.combinations(repeat_ids, half_n))
 
