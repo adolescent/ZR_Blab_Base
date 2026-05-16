@@ -36,7 +36,8 @@ class Single_Recording_Site(object):
                  offset=200,
                  used_on = np.arange(160,320),
                  save_train=False,
-                 prepare_data = True
+                 prepare_data = True,
+                 video=False,txt_path='None',img_size= 306
                  ):
         '''
         Save path need to be updated after load and save.
@@ -51,9 +52,14 @@ class Single_Recording_Site(object):
         self.brain_areas = brain_areas
         self.onset = onset
         self.offset = offset
-        self.img_size = int(self.gn_dic['meta_data']['img_size'])
         self.stim_info,_,_ = Load_Info(self.stimset)
         self.used_on = used_on
+        self.video = video
+        self.txt_path = txt_path
+        if not self.video:
+            self.img_size = int(self.gn_dic['meta_data']['img_size'])
+        else:
+            self.img_size = img_size
 
         #### Data prepare.
         if prepare_data:
@@ -72,6 +78,11 @@ class Single_Recording_Site(object):
         ## 2.transfer psth. This is necessary.
         print('Generating PSTH...')
         self.raw_psth = PSTH_From_Goodunit(self.gn_dic,self.img_size,'dict')
+
+        if self.video: # re-arrange stim id for video.
+            new_id = ot.Tsv_Txt_Align(self.txt_path,self.stim_info)
+            self.raw_psth = self.raw_psth[:,:,new_id,:]
+
         self.avr_psth = self.raw_psth.mean(1)
         ## 3. Noise ceiling, provide ceiling index.
         print('Calculating Noise Ceiling...')

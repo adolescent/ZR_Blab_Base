@@ -1,9 +1,16 @@
-
+#%%
 import os
+import re
 import struct
 import h5py
 import pickle
+from collections import defaultdict, deque
+
+import numpy as np
 import pandas as pd
+
+# First argument of Mov(...) in condition log, e.g. Mov(./task_video_adj/tool1sfm_Cycle1.avi,0.000,0.000)
+_MOV_PATH_RE = re.compile(r"Mov\s*\(\s*([^,)]+)", re.IGNORECASE)
 
 
 def Get_File_Name(path,file_type = '.jpg',keyword = ''):
@@ -148,3 +155,98 @@ def Load_Variable(save_folder,file_name=False):
         loaded_file = False
 
     return loaded_file
+
+
+def _normalize_tsv_filename(fn):
+    """Match ``FileName`` column to basename only (e.g. tool1sfm_Cycle1.avi)."""
+    s = str(fn).strip()
+    if not s:
+        return ''
+    return os.path.basename(s.replace("\\", "/"))
+
+
+def _video_filename_from_condition_txt_line(line):
+    """
+    Parse one line of ML condition log: extract video file from ``Mov(path,x,y)``.
+
+    ``path`` is often like ``./task_video_adj/tool1sfm_Cycle1.avi``; returns
+    basename only so it matches tsv ``FileName``.
+    """
+    s = str(line).strip()
+    if not s or s.startswith("#"):
+        return ""
+    m = _MOV_PATH_RE.search(s)
+    if not m:
+        return ""
+    path = m.group(1).strip().strip("'\"")
+    return os.path.basename(path.replace("\\", "/"))
+
+
+def Tsv_Txt_Align(txt_path, tsv_info):
+    """
+    Map each tsv row (design order) to the trial index used in GoodUnit rasters.
+
+    ``txt_path`` should be an ML-style condition log in **actual presentation
+    order**. Each trial row is expected to contain ``Mov(<path>, ...)`` where
+    ``<path>`` points to the video (e.g. ``./task_video_adj/foo.avi``); the
+    basename is matched to ``tsv_info['FileName']`` (e.g. ``foo.avi``). Trial
+    indices count only lines from which a ``Mov(...)`` path was parsed (0-based,
+    in file top-to-bottom order); blank lines are skipped.
+
+    Returns
+    -------
+    numpy.ndarray, shape (len(tsv_info),), dtype intp
+        ``new_seq[j]`` is the trial index (third axis of ``raw_rasters``) where
+        ``tsv_info['FileName'].iloc[j]`` was presented, so
+        ``raw_rasters[:, :, new_seq, :]`` aligns rasters to tsv row order.
+
+    Raises
+    ------
+    ValueError
+        If a tsv FileName cannot be matched to the txt list, or queues deplete.
+    """
+    if tsv_info is None or len(tsv_info) == 0:
+        raise ValueError('tsv_info is empty or None.')
+    if txt_path is None or (isinstance(txt_path, str) and txt_path.strip() in ('', 'None')):
+        raise ValueError('txt_path must be a path to the condition-order text file.')
+
+    df = tsv_info.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    if 'FileName' not in df.columns:
+        raise ValueError("tsv_info must contain a 'FileName' column.")
+
+    with open(txt_path, 'r', encoding='utf-8', errors='replace') as f:
+        txt_lines = f.readlines()
+
+    positions_by_label = defaultdict(deque)
+    trial_idx = 0
+    for line in txt_lines:
+        raw = line.rstrip("\n\r")
+        if not raw.strip():
+            continue
+        lab = _video_filename_from_condition_txt_line(raw)
+        if not lab:
+            continue
+        positions_by_label[lab].append(trial_idx)
+        trial_idx += 1
+
+    new_seq = np.empty(len(df), dtype=np.intp)
+    for j in range(len(df)):
+        fn = df['FileName'].iloc[j]
+        key = _normalize_tsv_filename(fn)
+        q = positions_by_label.get(key)
+        if not q:
+            raise ValueError(
+                f"No txt line matches tsv row {j} FileName={fn!r} (normalized {key!r})."
+            )
+        new_seq[j] = q.popleft()
+
+    # leftover txt entries -> warn via error if strict one-to-one expected
+    leftover = sum(len(q) for q in positions_by_label.values())
+    if leftover:
+        raise ValueError(
+            f'{leftover} txt line(s) were not consumed by tsv_info; check length and labels.'
+        )
+
+    return new_seq
+# %%
