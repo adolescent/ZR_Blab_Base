@@ -209,6 +209,27 @@ class Single_Recording_Site(object):
             c_frame = self.raw_rasters[:,c_series]
             self.ISI_Info_Frame.loc[i,:] = [prev_ids[i],have_break[i],c_frame]
 
+    def Cell_Selection(self,ceiling=0.3,prefer='Body',dp_thres=0.5):
+        ok_cell_ids = np.array(self.Site_Info[self.Site_Info.Ceiling_Index>(ceiling)].Cell)
+        # get tuned cells.
+        if prefer == 'Body':
+            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Body'].D_Prime)
+        elif prefer == 'Face':
+            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Face'].D_Prime)
+        elif prefer == 'Animate':
+            body_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Body'].D_Prime)
+            face_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Face'].D_Prime)
+            dps = np.maximum(body_dps, face_dps)
+        else:
+            raise ValueError('Preferred cell type not supported. Do it manually.')
+        tuned_cells = np.where(dps>dp_thres)[0]
+
+        ## summarize ok cells
+        used_cells = np.intersect1d(ok_cell_ids,tuned_cells)
+        tuned_psth = self.avr_psth[used_cells,:,:]
+        return used_cells,tuned_psth
+
+
     def __len__(self):
         return len(self.raw_psth)
 
