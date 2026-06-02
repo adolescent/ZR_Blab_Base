@@ -31,6 +31,20 @@ ani_cells,ani_psth = a.Cell_Selection(ceiling=0.2,prefer='Animate',dp_thres=0.5)
 len(ani_cells)
 redplot = ani_psth[:,:,150:500].sum(-1)
 redplot_z = (redplot-redplot.mean(1,keepdims=True))/redplot.std(1,keepdims=True)
+#%% FOB demo: show tuning pref of cells (24 Body | 24 Face | 24 Object)
+fob_divs = [24, 48]
+
+fig, ax = plt.subplots(figsize=(4, 6))
+sns.heatmap(redplot_z[:, :72], center=0, vmax=3, vmin=-3, cmap='RdBu_r',
+            xticklabels=False, yticklabels=False,
+            cbar = False, ax=ax)
+for x in fob_divs:
+    ax.axvline(x, color='yellow', lw=2)
+ax.set_xlabel('Body    |    Face    |  Object')
+ax.set_ylabel('Neuron')
+fig.tight_layout()
+
+
 # sns.heatmap(redplot_z[:,72:216],center=0,vmax=3,vmin=-3)
 #%%
 y = ani_psth[:, 72:360, :901].mean((0, 1))  # -100~800 ms, 1 ms bins
@@ -287,3 +301,6 @@ for sub, s in zip(['Body', 'Face', 'Fruit'], [0, 80, 160]):
 sub2_cross_decode = pd.DataFrame(rows)
 
 sub2_cross_decode
+
+#%%
+
