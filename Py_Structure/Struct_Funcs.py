@@ -220,6 +220,16 @@ class Single_Recording_Site(object):
             body_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Body'].D_Prime)
             face_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Face'].D_Prime)
             dps = np.maximum(body_dps, face_dps)
+        elif prefer == 'Spiky' or prefer == 'Stubby':
+            spiky_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category=='spiky']
+            stubby_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category=='stubby']
+            dps = np.zeros(len(self.raw_psth))
+            for i in range(len(self.raw_psth)):
+                cc_dp = np.nan_to_num(D_Prime(stubby_rsps[stubby_rsps.Cell==i].Response.values,spiky_rsps[spiky_rsps.Cell==i].Response.values)) # positive as spiky,negative as stubby.
+                dps[i] = cc_dp
+        elif prefer == 'all':
+            dps = np.ones(len(self.raw_psth))*114514 # 114514 is a magic number.
+
         else:
             raise ValueError('Preferred cell type not supported. Do it manually.')
         tuned_cells = np.where(dps>dp_thres)[0]
