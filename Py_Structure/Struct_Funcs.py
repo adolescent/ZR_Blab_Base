@@ -227,6 +227,8 @@ class Single_Recording_Site(object):
             for i in range(len(self.raw_psth)):
                 cc_dp = np.nan_to_num(D_Prime(stubby_rsps[stubby_rsps.Cell==i].Response.values,spiky_rsps[spiky_rsps.Cell==i].Response.values)) # positive as spiky,negative as stubby.
                 dps[i] = cc_dp
+            if prefer == 'Stubby':
+                dps = -dps
         elif prefer == 'all':
             dps = np.ones(len(self.raw_psth))*114514 # 114514 is a magic number.
 
