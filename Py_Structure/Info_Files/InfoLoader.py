@@ -42,7 +42,30 @@ def Load_Info(setname='Metamer_Singlebubble_v251107',load_mask=False):
 
     return tsv_info,masks,raw_mask_file
 
+#%% Define a new function, include how we select stim ids of fob and real response.
+# UPDATE EACH TIME YOU HAVE NEW STIMSET.
 
+def Select_Cell_Info(stim_info='Anagram'):
+
+    select_dicts = {}
+    if stim_info == 'Anagram':
+        stim_sets = ['Anagram_Jigsaw_v260227']
+        fob_styles = ['STI150']
+        fobids = [np.arange(150)]# if multi times, just use them all. 
+        data_id_list = [np.arange(150, 750)]
+    elif stim_info == 'Doodle':
+        pass
+        stim_sets = ['Doodle_AI_v260119','Doodle_AI_v260121','Doodle_AI_v260430']
+        fob_styles = ['STI150','STI150','Wordloc']
+        fobids = [np.arange(300),np.arange(300),np.arange(180)]
+        data_id_list = [np.arange(300, 3500),np.arange(300, 3500),np.arange(180, 3380)]
+
+    for i, c_stimset in enumerate(stim_sets):
+        select_dicts[c_stimset] = {
+            'FOB': {'style': fob_styles[i], 'id': fobids[i]},
+            'Data': data_id_list[i],
+        }
+    return select_dicts
 
 
 #%% test run
