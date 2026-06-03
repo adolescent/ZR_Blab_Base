@@ -211,23 +211,24 @@ class Single_Recording_Site(object):
 
     def Cell_Selection(self,ceiling=0.3,prefer='Body',dp_thres=0.5):
         ok_cell_ids = np.array(self.Site_Info[self.Site_Info.Ceiling_Index>(ceiling)].Cell)
+        prefer = prefer.lower() if isinstance(prefer, str) else prefer
         # get tuned cells.
-        if prefer == 'Body':
-            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Body'].D_Prime)
-        elif prefer == 'Face':
-            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Face'].D_Prime)
-        elif prefer == 'Animate':
-            body_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Body'].D_Prime)
-            face_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category=='Face'].D_Prime)
+        if prefer == 'body':
+            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category.str.lower() == 'body'].D_Prime)
+        elif prefer == 'face':
+            dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category.str.lower() == 'face'].D_Prime)
+        elif prefer == 'animate':
+            body_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category.str.lower() == 'body'].D_Prime)
+            face_dps = np.array(self.Cell_FOB_DPrimes[self.Cell_FOB_DPrimes.Category.str.lower() == 'face'].D_Prime)
             dps = np.maximum(body_dps, face_dps)
-        elif prefer == 'Spiky' or prefer == 'Stubby':
-            spiky_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category=='spiky']
-            stubby_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category=='stubby']
+        elif prefer == 'spiky' or prefer == 'stubby':
+            spiky_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category.str.lower() == 'spiky']
+            stubby_rsps = self.Cell_FOB_Response[self.Cell_FOB_Response.Category.str.lower() == 'stubby']
             dps = np.zeros(len(self.raw_psth))
             for i in range(len(self.raw_psth)):
                 cc_dp = np.nan_to_num(D_Prime(stubby_rsps[stubby_rsps.Cell==i].Response.values,spiky_rsps[spiky_rsps.Cell==i].Response.values)) # positive as spiky,negative as stubby.
                 dps[i] = cc_dp
-            if prefer == 'Stubby':
+            if prefer == 'stubby':
                 dps = -dps
         elif prefer == 'all':
             dps = np.ones(len(self.raw_psth))*114514 # 114514 is a magic number.
