@@ -55,7 +55,7 @@ def Select_Cell_Info(stim_info='Anagram'):
         data_id_list = [np.arange(150, 750)]
     elif stim_info == 'Doodle':
         pass
-        stim_sets = ['Doodle_AI_v260119','Doodle_AI_v260121','Doodle_AI_v260430']
+        stim_sets = ['Doodle_v260119','Doodle_v260121','Doodle_AI_v260430']
         fob_styles = ['STI150','STI150','Wordloc']
         fobids = [np.arange(300),np.arange(300),np.arange(180)]
         data_id_list = [np.arange(300, 3500),np.arange(300, 3500),np.arange(180, 3380)]
