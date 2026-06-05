@@ -239,3 +239,36 @@ fig = Triangle_FOB(pivot_dp,1,800,600,label=False)
 fig.write_html(ot.Join(save_path,f'{SRS.site_name}_{'_'.join(SRS.brain_areas)}.html'))
 
 
+#%%
+
+
+c_gn_path = r'E:\#Preprocessed_Data\GoodUnits\anagram_jigsaw\GoodUnit_260528_JianJian_Anagram_Jigsaw_v260227_g0_MSB.mat'
+SRS = Single_Recording_Site(gn_path=c_gn_path,
+                            stimset='Anagram_Jigsaw_v260227',
+                            brain_areas=['ML','MSB'],
+                            onset=300,
+                            offset=200,
+                            used_on=np.arange(160,320), 
+                            save_train=False,
+                            video=False
+                            )
+# SRS.__dict__.keys()
+
+JL.dump(SRS,ot.Join(save_path,f'{SRS.site_name}_{'_'.join(SRS.brain_areas)}_{SRS.stimset}.joblib'), compress=7) # save compressed file, 8 compress for speed and storage.
+# SRS = JL.load(r'E:\#Preprocessed_Data\SiteClass\251110_ZhuangZhuang_PV_OE_metamer_single_bubble_AL_ASB.joblib')
+# Plot FOB for class estimate generation
+#
+pivot_dp = pd.pivot(SRS.Cell_FOB_DPrimes,columns='Category',index='Cell',values='D_Prime')
+pivot_dp = pivot_dp[['Body','Face','Object']]
+
+fig = Triangle_FOB(pivot_dp,1,800,600,label=False)
+# fig.write_image("ternary_plot.png")
+fig.write_html(ot.Join(save_path,f'{SRS.site_name}_{'_'.join(SRS.brain_areas)}.html'))
+
+
+
+#%%
+if __name__ == '__main__':
+    test_SRS = JL.load(r'E:\#Preprocessed_Data\SiteClass\anagram_jigsaw\260528_JianJian_PV_OE_JigSaw_MSB_ML_Anagram_Jigsaw_v260227.joblib')
+
+    
