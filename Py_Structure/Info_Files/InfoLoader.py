@@ -54,11 +54,22 @@ def Select_Cell_Info(stim_info='Anagram'):
         fobids = [np.arange(150)]# if multi times, just use them all. 
         data_id_list = [np.arange(150, 750)]
     elif stim_info == 'Doodle':
-        pass
         stim_sets = ['Doodle_v260119','Doodle_v260121','Doodle_AI_v260430']
         fob_styles = ['STI150','STI150','Wordloc']
         fobids = [np.arange(300),np.arange(300),np.arange(180)]
         data_id_list = [np.arange(300, 3500),np.arange(300, 3500),np.arange(180, 3380)]
+
+    elif stim_info == 'Metamer_1k':
+        stim_sets = ['Metamer1072',
+                    'Metamer1300',
+                    'Mega_Metamer_v250920',
+                    'Mega_Metamer_v251104',
+                    'Metamer_Cut_v251011',
+                    'Metamer_Singlebubble_v251107',
+                    'Metamer_NSD']
+        fob_styles = ['FOB72','STI150','STI150','STI150','STI150','STI150','FOB72']
+        fobids = [np.arange(72),np.arange(1000,1300),np.arange(300),np.arange(300),np.arange(300),np.arange(300),np.arange(216)]
+        data_id_list = [np.arange(72,1072),np.arange(1000),np.arange(300,1300),np.arange(300,1300),np.arange(300,1300),np.arange(300,1300),np.arange(216,1216)] # only metamer id,other will be processed seperately.
 
     for i, c_stimset in enumerate(stim_sets):
         select_dicts[c_stimset] = {
