@@ -40,6 +40,9 @@ DP_THRES = 0.5
 MAX_REPEAT = 20
 TRIAL_BIN_MS = 5
 N_TIME_BIN = N_TIME // TRIAL_BIN_MS   # 450 -> 90
+FOB_LENGTHS = {'STI150': 150, 'Wordloc': 180, 'FOB72': 72}
+N_FOB_MAX = 150
+FOB_TIME_SLICE = slice(160, 320)   # same window as Stim_Cell_Rearrange
 BRAIN_AREAS = ['ML', 'MSB', 'AL', 'ASB']
 AREA_PREFER = {'ML': 'Face', 'AL': 'Face', 'MSB': 'Body', 'ASB': 'Body'}
 AREA_FOLDER = {
@@ -232,6 +235,171 @@ def plot_raster_first40(psth, out_path, n_img=40, bin_ms=5):
     plt.close(fig)
 
 
+def pad_fob_axis(arr, n_fob_max=N_FOB_MAX):
+    """Pad last axis to n_fob_max with NaN for stacked storage; native width in fob_valid_len."""
+    arr = np.asarray(arr, dtype=np.float32)
+    n_valid = int(arr.shape[-1])
+    if n_valid >= n_fob_max:
+        return arr[..., :n_fob_max], n_valid
+    out = np.full(arr.shape[:-1] + (n_fob_max,), np.nan, dtype=np.float32)
+    out[..., :n_valid] = arr
+    return out, n_valid
+
+
+def _fob_redplot_from_stim(stim_rsp, fob_ids, fob_style):
+    """(n_cell, [n_repeat,] n_stim) -> native (n_cell, [n_repeat,] fob_len); average duplicate FOB blocks."""
+    fob_len = FOB_LENGTHS[fob_style]
+    n_repeat_fob = len(fob_ids) // fob_len
+    arr = stim_rsp[..., fob_ids]
+    if n_repeat_fob > 1:
+        lead = arr.shape[:-1]
+        arr = arr.reshape(*lead, n_repeat_fob, fob_len).mean(axis=-2)
+    return arr
+
+
+def extract_fob_avr(avr_psth, fob_ids, fob_style, time_slice=FOB_TIME_SLICE):
+    """Average FOB — same logic as Stim_Cell_Rearrange (avr_psth, repeat-averaged)."""
+    redplot = avr_psth[:, :, time_slice].sum(-1).astype(np.float32)
+    return _fob_redplot_from_stim(redplot, fob_ids, fob_style)
+
+
+def extract_fob_by_trial(raw_psth, fob_ids, fob_style, time_slice=FOB_TIME_SLICE):
+    """Trial-level FOB from raw_psth (n_cell, n_repeat, n_stim, n_time)."""
+    trial_red = raw_psth[:, :, :, time_slice].sum(-1).astype(np.float32)
+    return _fob_redplot_from_stim(trial_red, fob_ids, fob_style)
+
+
+def plot_fob_heatmap(fob_avr, fob_valid_len, out_path, n_fob_max=N_FOB_MAX):
+    """Per-neuron z-score heatmap; only valid FOB columns shown (72 or 150), rest masked."""
+    fob_valid_len = np.asarray(fob_valid_len, dtype=np.int16)
+    n_cols = int(fob_valid_len.max()) if len(fob_valid_len) else n_fob_max
+    n_cols = min(n_cols, n_fob_max)
+
+    x = np.asarray(fob_avr[:, :n_cols], dtype=np.float64)
+    x_norm = np.full_like(x, np.nan)
+    for i in range(x.shape[0]):
+        n_v = int(fob_valid_len[i])
+        if n_v <= 0:
+            continue
+        row = x[i, :n_v]
+        std = row.std()
+        if std < 1e-8:
+            x_norm[i, :n_v] = 0.0
+        else:
+            x_norm[i, :n_v] = (row - row.mean()) / std
+
+    mask = np.ones_like(x_norm, dtype=bool)
+    for i, n_v in enumerate(fob_valid_len):
+        if n_v > 0:
+            mask[i, :min(int(n_v), n_cols)] = False
+
+    fig_h = max(4, min(20, x_norm.shape[0] * 0.02))
+    fig, ax = plt.subplots(figsize=(max(6, n_cols * 0.06), fig_h))
+    sns.heatmap(
+        x_norm, ax=ax, mask=mask, cmap='RdBu_r', center=0,
+        vmin=-3, vmax=3, xticklabels=False, yticklabels=False,
+        cbar_kws={'label': 'z-score (per neuron, valid FOB only)'},
+    )
+    ax.set_xlabel(f'FOB stimulus index (0–{n_cols - 1})')
+    ax.set_ylabel('Neuron')
+    ax.set_title(f'FOB response — {x_norm.shape[0]} cells (72 or 150 per stimset)')
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+
+def build_site_manifest(site_chunks, info_df):
+    """Lightweight per-site index for standalone FOB pass (no full re-export)."""
+    manifest = []
+    for chunk in site_chunks:
+        row = info_df.iloc[chunk['offset']]
+        manifest.append({
+            'path': chunk['path'],
+            'selected': chunk['selected'],
+            'stimset': row['stimset'],
+            'site_name': row['site_name'],
+            'offset': chunk['offset'],
+            'n_cell': chunk['n_cell'],
+            'n_repeat': chunk['n_repeat'],
+        })
+    return manifest
+
+
+def export_fob_for_area(cloc, save_root=savepath, stim_infos=None):
+    """
+    Standalone FOB export: reads site_manifest.joblib + cell_site_info from save_root/<cloc>/.
+    Loads each site joblib once; uses saved cell indices (no Cell_Selection).
+    """
+    if stim_infos is None:
+        stim_infos = Select_Cell_Info('Metamer_1k')
+
+    out_dir = ot.Join(save_root, cloc)
+    manifest_path = ot.Join(out_dir, 'site_manifest.joblib')
+    if not os.path.exists(manifest_path):
+        raise FileNotFoundError(f'missing {manifest_path} — run main export first')
+
+    info_jl = ot.Join(out_dir, 'cell_site_info.joblib')
+    info_df = JL.load(info_jl) if os.path.exists(info_jl) else pd.read_csv(
+        ot.Join(out_dir, 'cell_site_info.csv'),
+    )
+    site_manifest = JL.load(manifest_path)
+    n_cell_total = len(info_df)
+    n_repeat_max = min(MAX_REPEAT, int(info_df['n_repeat'].max()))
+
+    fob_by_trial = np.full(
+        (n_cell_total, n_repeat_max, N_FOB_MAX), np.nan, dtype=np.float32,
+    )
+    fob_avr = np.full((n_cell_total, N_FOB_MAX), np.nan, dtype=np.float32)
+    fob_valid_len = np.zeros(n_cell_total, dtype=np.int16)
+    fob_style_arr = np.empty(n_cell_total, dtype=object)
+
+    for entry in tqdm(site_manifest, desc=f'{cloc} FOB'):
+        SRS = JL.load(entry['path'])
+        stimset = entry['stimset']
+        selected = entry['selected']
+        off, n_c = entry['offset'], entry['n_cell']
+        n_r = min(entry['n_repeat'], n_repeat_max)
+
+        fob_info = stim_infos[stimset]['FOB']
+        fob_style = fob_info['style']
+        fob_ids = fob_info['id']
+
+        raw = SRS.raw_psth[selected]
+        avr_p = SRS.avr_psth[selected]
+        fob_tri = extract_fob_by_trial(raw, fob_ids, fob_style)
+        fob_mean = extract_fob_avr(avr_p, fob_ids, fob_style)
+        fob_tri_pad, n_valid = pad_fob_axis(fob_tri)
+        fob_mean_pad, _ = pad_fob_axis(fob_mean)
+
+        fob_by_trial[off:off + n_c, :n_r] = fob_tri_pad[:, :n_r]
+        fob_avr[off:off + n_c] = fob_mean_pad
+        fob_valid_len[off:off + n_c] = n_valid
+        fob_style_arr[off:off + n_c] = fob_style
+
+        del SRS, raw, avr_p, fob_tri, fob_mean, fob_tri_pad, fob_mean_pad
+        gc.collect()
+
+    np.savez_compressed(
+        ot.Join(out_dir, 'fob_by_trial.npz'),
+        fob_by_trial=fob_by_trial,
+        n_repeat_valid=info_df['n_repeat'].to_numpy(dtype=np.int16),
+        n_fob_max=np.int16(N_FOB_MAX),
+        brain_area=cloc,
+    )
+    np.save(ot.Join(out_dir, 'fob_avr.npy'), fob_avr)
+    np.savez_compressed(
+        ot.Join(out_dir, 'fob_meta.npz'),
+        fob_valid_len=fob_valid_len,
+        fob_style=fob_style_arr,
+        n_fob_max=np.int16(N_FOB_MAX),
+        brain_area=cloc,
+    )
+    plot_fob_heatmap(fob_avr, fob_valid_len, ot.Join(out_dir, 'heatmap_fob.png'))
+
+    print(f'{cloc}: FOB saved {n_cell_total} cells -> {out_dir}')
+    return fob_by_trial, fob_avr
+
+
 #%% =============================================================================
 # ONE-TIME ONLY — refresh site_class: MF→ML, redo noise ceiling & FOB tuning
 # Skip this cell on routine re-exports.
@@ -397,13 +565,27 @@ for cloc in BRAIN_AREAS:
     plot_heatmap(avr_rsp, ot.Join(out_dir, 'heatmap_1k.png'))
     plot_raster_first40(psth, ot.Join(out_dir, 'raster_first40.png'))
 
-    del trials_rsp, avr_rsp, psth, site_chunks
+    site_manifest = build_site_manifest(site_chunks, info_df)
+    JL.dump(site_manifest, ot.Join(out_dir, 'site_manifest.joblib'), compress=3)
+
+    del trials_rsp, avr_rsp, psth, site_chunks, site_manifest
     gc.collect()
 
     print(f'{cloc}: saved {n_cell_total} cells -> {out_dir}')
 
 
-#%%
+#%% FOB export (standalone — reads savepath/<area>/site_manifest.joblib)
+# Run after main export, or independently on an existing savepath folder.
 
+RUN_FOB_EXPORT = True
 
+if RUN_FOB_EXPORT:
+    _stim_infos_fob = Select_Cell_Info('Metamer_1k')
+    for _cloc in BRAIN_AREAS:
+        try:
+            export_fob_for_area(_cloc, savepath, _stim_infos_fob)
+        except FileNotFoundError as _e:
+            print(f'{_cloc} FOB skip: {_e}')
+        except Exception as _e:
+            print(f'{_cloc} FOB failed: {_e}')
 
