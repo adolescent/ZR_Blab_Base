@@ -108,7 +108,7 @@ def Mkdir(path,mute = False):
             print('Folder',path,'already exists!')
         return False
     else:
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
         return True
     
 
