@@ -78,10 +78,11 @@ def H5_File_Tree(val,pre = ''):
                 except TypeError:
                     print(pre + '├── ' + key + ' (scalar)')
 
-def Join(path1,path2):
-
-    joined_path = os.path.join(path1,path2)
-    return joined_path
+def Join(*paths):
+    """Join two or more path segments. Same idea as os.path.join."""
+    if len(paths) < 2:
+        raise TypeError('Join() expects at least 2 path arguments')
+    return os.path.join(*paths)
 
 def Mkdir(path,mute = False):
     '''
