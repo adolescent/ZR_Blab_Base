@@ -1,15 +1,22 @@
 
 '''
-Codes for standarization operation to get metamer1k stimuli from each site class.
+Codes for standarization operation to get Metamer_NSD stimuli from each site class.
 
 Four brain areas (ML, MSB, AL, ASB): select cells, export averaged responses,
-PSTH, trial-level raw data, and summary figures.
+PSTH, trial-level raw data, FOB tuning, and summary figures.
+
+Stimulus layout (Metamer_NSD stimset, 2216 total in recording):
+  - FOB72 tuning block: indices 0–71 (exported separately via FOB pass)
+  - FOB repeat block: indices 72–215 (not in response export)
+  - Response block (exported): indices 216–2215 (2000 images)
+      [0:1000]    Metamer 1000 (stim 216–1215)
+      [1000:2000] NSD 1000 (stim 1216–2215)
 '''
 
 
 #%% paths and imports
 
-from Py_Structure.Info_Files.InfoLoader import Select_Cell_Info
+from Py_Structure.Info_Files.InfoLoader import Select_Cell_Info, Load_Info
 from Py_Structure.Struct_Funcs import Single_Recording_Site
 from Py_Structure.Site_Class_Lite import (
     DEFAULT_INDEX_PATH,
@@ -33,14 +40,18 @@ import warnings
 site_class_alasb = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
 site_class_mlmsb = r'E:\#Preprocessed_Data\SiteClass\Metamers\ML_MSB'
 
-savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Metamer_NSD_2k'
 SITE_INDEX_PATH = DEFAULT_INDEX_PATH
 RUN_LITE_SCAN = False   # True: refresh index before export (run Site_Class_Lite_Scan.py instead)
 
 
 RUN_SITE_REFRESH = False  # set True to run once, then set back to False
-select_mod = 'Metamer_1k'
-N_IMG = 1000
+select_mod = 'Metamer_NSD'
+N_IMG_METAMER = 1000
+N_IMG_NSD = 1000
+N_IMG = N_IMG_METAMER + N_IMG_NSD   # 2000; matches InfoLoader np.arange(216, 2216)
+SLICE_METAMER = slice(0, N_IMG_METAMER)
+SLICE_NSD = slice(N_IMG_METAMER, N_IMG)
 N_TIME = 450
 TIME_SLICE = slice(150, 320)   # 50–219 ms, 1 ms bins, onset=300
 T_MS = np.arange(-100, -100 + N_TIME)
@@ -199,7 +210,7 @@ def bin_psth_hz(psth_2d, bin_ms=5):
     return fr, t_plot
 
 
-def plot_heatmap(avr_rsp, out_path):
+def plot_heatmap(avr_rsp, out_path, n_img=N_IMG):
     x = np.asarray(avr_rsp, dtype=np.float64)
     row_mean = x.mean(1, keepdims=True)
     row_std = x.std(1, keepdims=True) + 1e-8
@@ -212,9 +223,12 @@ def plot_heatmap(avr_rsp, out_path):
         vmin=-3, vmax=3, xticklabels=False, yticklabels=False,
         cbar_kws={'label': 'z-score (per neuron)'},
     )
-    ax.set_xlabel('Metamer image index (0–999)')
+    ax.set_xlabel(f'Stimulus index (0–{n_img - 1})')
     ax.set_ylabel('Neuron')
-    ax.set_title(f'Normalized response — {x_norm.shape[0]} cells × 1000 images')
+    ax.set_title(
+        f'Normalized response — {x_norm.shape[0]} cells × {n_img} images '
+        f'(metamer {N_IMG_METAMER} + NSD {N_IMG_NSD})',
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
@@ -311,7 +325,7 @@ def plot_fob_heatmap(fob_avr, fob_valid_len, out_path, n_fob_max=N_FOB_MAX):
     )
     ax.set_xlabel(f'FOB stimulus index (0–{n_cols - 1})')
     ax.set_ylabel('Neuron')
-    ax.set_title(f'FOB response — {x_norm.shape[0]} cells (72 or 150 per stimset)')
+    ax.set_title(f'FOB response — {x_norm.shape[0]} cells (FOB72)')
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
@@ -334,13 +348,49 @@ def build_site_manifest(site_chunks, info_df):
     return manifest
 
 
+def export_stim_layout(save_root=savepath):
+    """One-time stimulus index map at save_root (shared across brain areas)."""
+    stim_infos = Select_Cell_Info(select_mod)
+    data_ids = np.asarray(stim_infos['Metamer_NSD']['Data'], dtype=np.int32)
+    tsv_info, _, _ = Load_Info('Metamer_NSD')
+    if tsv_info is None:
+        raise FileNotFoundError('Metamer_NSD.tsv not found in Info_Files')
+
+    stim_set = tsv_info.iloc[data_ids]['Stim_Set'].to_numpy(dtype=object)
+    category = tsv_info.iloc[data_ids]['Category'].to_numpy(dtype=object)
+    obj_id = tsv_info.iloc[data_ids]['Object'].to_numpy(dtype=np.int32)
+
+    stim_type = np.empty(len(data_ids), dtype=object)
+    stim_type[SLICE_METAMER] = 'metamer'
+    stim_type[SLICE_NSD] = 'nsd'
+
+    out_path = ot.Join(save_root, 'stim_layout.npz')
+    ot.Mkdir(save_root)
+    np.savez_compressed(
+        out_path,
+        data_ids=data_ids,
+        stim_index=np.arange(len(data_ids), dtype=np.int32),
+        stim_set=stim_set,
+        category=category,
+        object_id=obj_id,
+        stim_type=stim_type,
+        slice_metamer=np.array(SLICE_METAMER.indices(N_IMG), dtype=np.int32),
+        slice_nsd=np.array(SLICE_NSD.indices(N_IMG), dtype=np.int32),
+        n_img=np.int32(N_IMG),
+        n_metamer=np.int32(N_IMG_METAMER),
+        n_nsd=np.int32(N_IMG_NSD),
+    )
+    print(f'stim_layout saved -> {out_path}')
+    return out_path
+
+
 def export_fob_for_area(cloc, save_root=savepath, stim_infos=None):
     """
     Standalone FOB export: reads site_manifest.joblib + cell_site_info from save_root/<cloc>/.
     Loads each site joblib once; uses saved cell indices (no Cell_Selection).
     """
     if stim_infos is None:
-        stim_infos = Select_Cell_Info('Metamer_1k')
+        stim_infos = Select_Cell_Info(select_mod)
 
     out_dir = ot.Join(save_root, cloc)
     manifest_path = ot.Join(out_dir, 'site_manifest.joblib')
@@ -417,6 +467,8 @@ if RUN_LITE_SCAN or not os.path.exists(SITE_INDEX_PATH):
 else:
     site_index = load_site_class_index(SITE_INDEX_PATH)
 
+print(f'site_class_lite v{LITE_VERSION}, columns={list(site_index.columns)}')
+
 
 #%% =============================================================================
 # ONE-TIME ONLY — refresh site_class: MF→ML, redo noise ceiling & FOB tuning
@@ -427,9 +479,8 @@ else:
 
 if RUN_SITE_REFRESH:
     warnings.filterwarnings('ignore', message='.*constant.*')
-    _1k_stimsets = set(Select_Cell_Info(select_mod).keys())
-    _refresh_paths = site_index[site_index['stimset'].isin(_1k_stimsets)]['path'].tolist()
-    for c_site in tqdm(_refresh_paths, desc='refresh Metamer_1k'):
+    _nsd_paths = site_index[site_index['stimset'] == 'Metamer_NSD']['path'].tolist()
+    for c_site in tqdm(_nsd_paths, desc='refresh Metamer_NSD'):
         try:
             SRS = JL.load(c_site)
             SRS = refresh_site_metrics(SRS)
@@ -442,6 +493,11 @@ if RUN_SITE_REFRESH:
         finally:
             gc.collect()
     print('Site-class refresh done.')
+
+
+#%% export stimulus layout (shared, run once)
+
+export_stim_layout(savepath)
 
 
 #%% export four brain areas
@@ -481,7 +537,7 @@ for cloc in BRAIN_AREAS:
             del SRS
             continue
 
-        raw = SRS.raw_psth[selected][:, :, data_ids, :]  # (n, n_repeat, 1000, 450)
+        raw = SRS.raw_psth[selected][:, :, data_ids, :]  # (n, n_repeat, 2000, 450)
         n_cell, n_repeat, _, _ = raw.shape
         n_repeat_max = max(n_repeat_max, n_repeat)
 
@@ -574,7 +630,7 @@ for cloc in BRAIN_AREAS:
         prefer=prefer,
     )
 
-    plot_heatmap(avr_rsp, ot.Join(out_dir, 'heatmap_1k.png'))
+    plot_heatmap(avr_rsp, ot.Join(out_dir, 'heatmap_2k.png'))
     plot_raster_first40(psth, ot.Join(out_dir, 'raster_first40.png'))
 
     site_manifest = build_site_manifest(site_chunks, info_df)
@@ -592,7 +648,7 @@ for cloc in BRAIN_AREAS:
 RUN_FOB_EXPORT = True
 
 if RUN_FOB_EXPORT:
-    _stim_infos_fob = Select_Cell_Info('Metamer_1k')
+    _stim_infos_fob = Select_Cell_Info(select_mod)
     for _cloc in BRAIN_AREAS:
         try:
             export_fob_for_area(_cloc, savepath, _stim_infos_fob)
@@ -600,4 +656,3 @@ if RUN_FOB_EXPORT:
             print(f'{_cloc} FOB skip: {_e}')
         except Exception as _e:
             print(f'{_cloc} FOB failed: {_e}')
-

@@ -70,6 +70,11 @@ def Select_Cell_Info(stim_info='Anagram'):
         fob_styles = ['FOB72','STI150','STI150','STI150','STI150','STI150','FOB72']
         fobids = [np.arange(72),np.arange(1000,1300),np.arange(300),np.arange(300),np.arange(300),np.arange(300),np.arange(216)]
         data_id_list = [np.arange(72,1072),np.arange(1000),np.arange(300,1300),np.arange(300,1300),np.arange(300,1300),np.arange(300,1300),np.arange(216,1216)] # only metamer id,other will be processed seperately.
+    elif stim_info == 'Metamer_NSD':
+        stim_sets = ['Metamer_NSD']
+        fob_styles = ['FOB72']
+        fobids = [np.arange(72)]
+        data_id_list = [np.arange(216,2216)]# 1000metamer+1000nsd
 
     for i, c_stimset in enumerate(stim_sets):
         select_dicts[c_stimset] = {
