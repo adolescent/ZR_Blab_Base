@@ -75,6 +75,11 @@ def Select_Cell_Info(stim_info='Anagram'):
         fob_styles = ['FOB72']
         fobids = [np.arange(72)]
         data_id_list = [np.arange(216,2216)]# 1000metamer+1000nsd
+    elif stim_info == 'Metamer_Bubble':
+        stim_sets = ['Metamer_Singlebubble_v251107']
+        fob_styles = ['STI150']
+        fobids = [np.arange(300)]
+        data_id_list = [np.arange(300, 4540)]
 
     for i, c_stimset in enumerate(stim_sets):
         select_dicts[c_stimset] = {
