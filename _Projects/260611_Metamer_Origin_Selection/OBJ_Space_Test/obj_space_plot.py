@@ -5,6 +5,7 @@ import OS_Tools as ot
 SCRIPT_TEST_RSP = 'Test_Obj_Space_Rsp'
 SCRIPT_THOUGHT = 'Obj_Space_Thought_Reversed'
 SCRIPT_MEDIATION = 'Obj_Space_Shuffle_Intersected'
+SCRIPT_METAMER_NSD = 'Obj_Space_Metamer_NSD'
 
 SAVE_FIGURES = True
 SHOW_FIGURES = True
