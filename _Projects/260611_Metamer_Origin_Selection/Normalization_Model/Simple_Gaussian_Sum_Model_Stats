@@ -1,0 +1,77 @@
+'''
+本节统计简单高斯模型的解释方差，以及其与更复杂的normalization model的效果比较。
+'''
+
+
+#%%
+
+from pathlib import Path
+
+import pandas as pd
+
+savepath = Path(
+    r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\Normalization_Bubble\Stat_Results'
+)
+savepath.mkdir(parents=True, exist_ok=True)
+
+norm_fit_path = Path(
+    r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\Normalization_Bubble\Normalization_Results\normalization_bubble_fit.pkl'
+)
+gauss_fit_path = Path(
+    r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\Normalization_Bubble\Simple_Gaussian_Model'
+)
+
+AREAS = ['ML', 'MSB', 'AL', 'ASB']
+
+
+#%% 统计1 - 分脑区、分模型比较 bubble 拟合 R2
+
+def area_r2_summary(df, model_name):
+    rows = []
+    for area in AREAS:
+        r2 = df.loc[df['area'] == area, 'r2']
+        rows.append({
+            'area': area,
+            'model': model_name,
+            'median_r2': r2.median(),
+            'mean_r2': r2.mean(),
+            'n': len(r2),
+        })
+    return pd.DataFrame(rows)
+
+
+norm_df = pd.read_pickle(norm_fit_path)
+
+gauss_subsets = {
+    'gaussian_bubble_rest': 'bubble_rest',
+    'gaussian_bubble_only': 'bubble_only',
+    'gaussian_rest_only': 'rest_only',
+}
+
+summary_parts = [area_r2_summary(norm_df, 'normalization')]
+
+for model_name, subset in gauss_subsets.items():
+    gauss_df = pd.read_pickle(gauss_fit_path / subset / 'gaussian_sum_fit.pkl')
+    summary_parts.append(area_r2_summary(gauss_df, model_name))
+
+r2_compare_df = pd.concat(summary_parts, ignore_index=True)
+r2_compare_df = r2_compare_df.sort_values(['area', 'model']).reset_index(drop=True)
+
+# 宽表：每个脑区一行，各模型 median R2 为列
+r2_compare_wide_df = (
+    r2_compare_df
+    .pivot(index='area', columns='model', values='median_r2')
+    .reindex(AREAS)
+)
+
+r2_compare_df.to_pickle(savepath / 'model_r2_compare_long.pkl')
+r2_compare_df.to_csv(savepath / 'model_r2_compare_long.csv', index=False, encoding='utf-8-sig')
+r2_compare_wide_df.to_pickle(savepath / 'model_r2_compare_wide.pkl')
+r2_compare_wide_df.to_csv(savepath / 'model_r2_compare_wide.csv', encoding='utf-8-sig')
+
+print('Long format:')
+print(r2_compare_df.to_string(index=False))
+print('\nWide format (median R2):')
+print(r2_compare_wide_df.round(3))
+
+r2_compare_df
