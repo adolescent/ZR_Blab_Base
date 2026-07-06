@@ -8,6 +8,7 @@ Each fit reports in-sample r2 (full data) and cv_r2 (mean test R2 across 5 folds
 '''
 #%%
 from pathlib import Path
+import gc
 import warnings
 
 import numpy as np
@@ -40,6 +41,11 @@ MAX_NFEV = 500
 MIN_RSP_VAR = 1e-8
 N_CV_FOLDS = 5
 CV_SEED = 42
+CV_N_STARTS = N_STARTS
+CV_MAX_NFEV = MAX_NFEV
+WRITE_BATCH_SIZE = 5000
+RESUME = True
+CHECKPOINT_COLS = ['area', 'cell_idx', 'object_id', 'data_subset', 'model_name']
 
 MAX_CELLS_PER_AREA = None
 MAX_OBJECTS = None
@@ -144,9 +150,27 @@ def downsample_masks(mask_stack, factor=MASK_DOWNSAMPLE):
 
 def prepare_object_masks(masks, object_index, factor=MASK_DOWNSAMPLE):
     prepared = {}
+    fit_shape = None
     for obj, idx in object_index.items():
-        prepared[obj] = downsample_masks(masks[idx['raw_mask_ids']], factor=factor)
-    return prepared
+        downsampled = downsample_masks(masks[idx['raw_mask_ids']], factor=factor)
+        if fit_shape is None:
+            fit_shape = downsampled.shape[1:]
+        elif downsampled.shape[1:] != fit_shape:
+            raise ValueError(
+                f'Object {obj}: expected downsampled shape {fit_shape}, '
+                f'got {downsampled.shape[1:]}.'
+            )
+        prepared[obj] = np.ascontiguousarray(
+            downsampled.reshape(downsampled.shape[0], -1),
+            dtype=np.float64,
+        )
+    return prepared, fit_shape
+
+
+def as_mask_matrix(mask_stack):
+    if mask_stack.ndim == 2:
+        return mask_stack
+    return np.ascontiguousarray(mask_stack.reshape(mask_stack.shape[0], -1))
 
 
 def get_subset_data(subset, idx, mask_stack):
@@ -165,8 +189,10 @@ def get_subset_data(subset, idx, mask_stack):
 
 
 layout, masks_raw, object_index = load_shared_layout_and_masks()
-object_masks = prepare_object_masks(masks_raw, object_index, factor=MASK_DOWNSAMPLE)
-fit_grid_h, fit_grid_w = next(iter(object_masks.values())).shape[1:]
+object_masks, fit_grid_shape = prepare_object_masks(
+    masks_raw, object_index, factor=MASK_DOWNSAMPLE
+)
+fit_grid_h, fit_grid_w = fit_grid_shape
 raw_grid_h, raw_grid_w = masks_raw.shape[1:]
 
 print(
@@ -201,7 +227,7 @@ def calc_fit_metrics(y_true, y_pred):
 
 def normalization_predict(theta, mask_stack):
     b, k, sigma, active_x, active_y, active_std, neg_x, neg_y, neg_std = theta
-    mask_flat = mask_stack.reshape(mask_stack.shape[0], -1)
+    mask_flat = as_mask_matrix(mask_stack)
     active_kernel = gaussian_kernel_2d(active_x, active_y, active_std)
     negative_kernel = gaussian_kernel_2d(neg_x, neg_y, neg_std)
     active_drive = mask_flat @ active_kernel
@@ -211,14 +237,14 @@ def normalization_predict(theta, mask_stack):
 
 def gaussian_sum_predict(theta, mask_stack):
     b, k, active_x, active_y, active_std = theta
-    mask_flat = mask_stack.reshape(mask_stack.shape[0], -1)
+    mask_flat = as_mask_matrix(mask_stack)
     active_kernel = gaussian_kernel_2d(active_x, active_y, active_std)
     active_drive = mask_flat @ active_kernel
     return b + k * active_drive
 
 
 def response_weighted_center(mask_stack, response, mode='high'):
-    mask_flat = mask_stack.reshape(mask_stack.shape[0], -1)
+    mask_flat = as_mask_matrix(mask_stack)
     response = np.asarray(response, dtype=np.float64)
 
     if mode == 'high':
@@ -237,7 +263,15 @@ def response_weighted_center(mask_stack, response, mode='high'):
     return x0, y0
 
 
-def _run_least_squares_fit(y, mask_stack, predict_fn, build_starts, bounds_fn):
+def _run_least_squares_fit(
+    y,
+    mask_stack,
+    predict_fn,
+    build_starts,
+    bounds_fn,
+    n_starts=N_STARTS,
+    max_nfev=MAX_NFEV,
+):
     y = np.asarray(y, dtype=np.float64)
     finite = np.isfinite(y)
     y = y[finite]
@@ -248,6 +282,11 @@ def _run_least_squares_fit(y, mask_stack, predict_fn, build_starts, bounds_fn):
             'success': False,
             'message': 'too_few_valid_observations',
             'n_obs': int(len(y)),
+            'r2': np.nan,
+            'rmse': np.nan,
+            'mae': np.nan,
+            'cost': np.nan,
+            'nfev': 0,
         }
 
     if float(np.nanvar(y)) < MIN_RSP_VAR:
@@ -271,15 +310,16 @@ def _run_least_squares_fit(y, mask_stack, predict_fn, build_starts, bounds_fn):
     def residual_func(theta):
         return predict_fn(theta, mask_stack) - y
 
-    for x0 in build_starts(y, mask_stack):
+    for x0 in build_starts(y, mask_stack)[:n_starts]:
         x0 = np.clip(np.asarray(x0, dtype=np.float64), lower, upper)
         try:
             result = least_squares(
                 residual_func,
                 x0=x0,
                 bounds=(lower, upper),
-                max_nfev=MAX_NFEV,
+                max_nfev=max_nfev,
                 loss='soft_l1',
+                x_scale='jac',
             )
         except Exception as exc:
             warnings.warn(f'least_squares failed from one start: {exc}')
@@ -294,6 +334,11 @@ def _run_least_squares_fit(y, mask_stack, predict_fn, build_starts, bounds_fn):
             'success': False,
             'message': 'all_starts_failed',
             'n_obs': int(len(y)),
+            'r2': np.nan,
+            'rmse': np.nan,
+            'mae': np.nan,
+            'cost': np.nan,
+            'nfev': 0,
         }
 
     y_pred = predict_fn(best.x, mask_stack)
@@ -327,7 +372,7 @@ def _norm_build_starts(y, mask_stack):
         [y_min, y_range, 0.05, active_center[0], active_center[1], std_small, center[0], center[1], std_large],
         [float(np.nanmean(y)), y_range, 0.50, center[0], center[1], std_large, neg_center[0], neg_center[1], std_small],
     ]
-    return starts[:N_STARTS]
+    return starts
 
 
 def _norm_bounds(y):
@@ -364,7 +409,7 @@ def _gauss_build_starts(y, mask_stack):
         [y_min, y_range, active_center[0], active_center[1], std_small],
         [float(np.nanmean(y)), y_range, center[0], center[1], std_large],
     ]
-    return starts[:N_STARTS]
+    return starts
 
 
 def _gauss_bounds(y):
@@ -382,19 +427,30 @@ def _gauss_bounds(y):
     return np.asarray(lower, dtype=np.float64), np.asarray(upper, dtype=np.float64)
 
 
-def fit_one_normalization_model(y, mask_stack):
+def fit_one_normalization_model(y, mask_stack, n_starts=N_STARTS, max_nfev=MAX_NFEV):
     return _run_least_squares_fit(
-        y, mask_stack, normalization_predict, _norm_build_starts, _norm_bounds
+        y, mask_stack, normalization_predict, _norm_build_starts, _norm_bounds,
+        n_starts=n_starts, max_nfev=max_nfev,
     )
 
 
-def fit_one_gaussian_sum_model(y, mask_stack):
+def fit_one_gaussian_sum_model(y, mask_stack, n_starts=N_STARTS, max_nfev=MAX_NFEV):
     return _run_least_squares_fit(
-        y, mask_stack, gaussian_sum_predict, _gauss_build_starts, _gauss_bounds
+        y, mask_stack, gaussian_sum_predict, _gauss_build_starts, _gauss_bounds,
+        n_starts=n_starts, max_nfev=max_nfev,
     )
 
 
-def cross_val_r2(y, mask_stack, fit_fn, predict_fn, n_splits=N_CV_FOLDS, seed=CV_SEED):
+def cross_val_r2(
+    y,
+    mask_stack,
+    fit_fn,
+    predict_fn,
+    n_splits=N_CV_FOLDS,
+    seed=CV_SEED,
+    cv_n_starts=CV_N_STARTS,
+    cv_max_nfev=CV_MAX_NFEV,
+):
     y = np.asarray(y, dtype=np.float64)
     finite = np.isfinite(y)
     y = y[finite]
@@ -407,11 +463,19 @@ def cross_val_r2(y, mask_stack, fit_fn, predict_fn, n_splits=N_CV_FOLDS, seed=CV
     idx = rng.permutation(len(y))
     folds = np.array_split(idx, n_splits)
     fold_r2s = []
+    all_idx = np.arange(len(y))
 
     for i in range(n_splits):
         test_idx = folds[i]
-        train_idx = np.concatenate([folds[j] for j in range(n_splits) if j != i])
-        theta, _, _ = fit_fn(y[train_idx], mask_stack[train_idx])
+        train_mask = np.ones(len(y), dtype=bool)
+        train_mask[test_idx] = False
+        train_idx = all_idx[train_mask]
+        theta, _, _ = fit_fn(
+            y[train_idx],
+            mask_stack[train_idx],
+            n_starts=cv_n_starts,
+            max_nfev=cv_max_nfev,
+        )
         if theta is None:
             fold_r2s.append(np.nan)
             continue
@@ -473,8 +537,52 @@ def subset_n_counts(subset, idx):
     return 0, int(idx['n_rest'])
 
 
-def fit_all():
+def write_records_batch(records, out_csv, write_header):
+    if not records:
+        return 0
+    batch_df = pd.DataFrame.from_records(records)
+    batch_df.to_csv(
+        out_csv,
+        mode='a',
+        header=write_header,
+        index=False,
+        encoding='utf-8',
+    )
+    n_rows = len(batch_df)
+    del batch_df
+    return n_rows
+
+
+def make_record_key(area, cell_idx, object_id, data_subset, model_name):
+    return (area, int(cell_idx), int(object_id), data_subset, model_name)
+
+
+def load_completed_keys(out_csv):
+    if out_csv is None or not out_csv.exists():
+        return set()
+    try:
+        existing = pd.read_csv(out_csv, usecols=CHECKPOINT_COLS)
+    except (ValueError, pd.errors.EmptyDataError):
+        return set()
+    return {
+        make_record_key(row.area, row.cell_idx, row.object_id, row.data_subset, row.model_name)
+        for row in existing.itertuples(index=False)
+    }
+
+
+def fit_all(out_csv=None, resume=RESUME):
     records = []
+    n_written = 0
+    n_skipped = 0
+    n_fitted = 0
+    completed_keys = load_completed_keys(out_csv) if resume else set()
+    write_header = not (resume and out_csv is not None and out_csv.exists())
+
+    if not resume and out_csv is not None and out_csv.exists():
+        out_csv.unlink()
+
+    if resume and completed_keys:
+        print(f'Resuming from checkpoint: {len(completed_keys)} fits already in {out_csv}')
 
     for area in AREAS:
         avr_rsp, cell_info = load_area_data(area)
@@ -492,6 +600,13 @@ def fit_all():
                     n_bubble, n_rest = subset_n_counts(subset, idx)
 
                     for model_name, (fit_fn, pred_fn) in MODELS.items():
+                        record_key = make_record_key(
+                            area, cell_idx, object_id, subset, model_name
+                        )
+                        if record_key in completed_keys:
+                            n_skipped += 1
+                            continue
+
                         theta, _, fit_info = fit_fn(y, mask_stack)
                         cv_r2 = cross_val_r2(y, mask_stack, fit_fn, pred_fn)
 
@@ -518,14 +633,36 @@ def fit_all():
                         record.update(fit_info)
                         record.update(params_to_record(theta, model_name))
                         records.append(record)
+                        completed_keys.add(record_key)
+                        n_fitted += 1
+
+                        if out_csv is not None and len(records) >= WRITE_BATCH_SIZE:
+                            n_written += write_records_batch(
+                                records, out_csv, write_header
+                            )
+                            write_header = False
+                            records.clear()
+                            gc.collect()
+
+        del avr_rsp, cell_info
+        gc.collect()
+
+    if out_csv is not None:
+        n_written += write_records_batch(records, out_csv, write_header)
+        records.clear()
+        gc.collect()
+        print(
+            f'Fit summary: {n_fitted} new, {n_skipped} skipped, '
+            f'{n_written} rows written this run to {out_csv}'
+        )
+        return pd.read_csv(out_csv)
 
     return pd.DataFrame(records)
 
 
-fit_df = fit_all()
-
 out_pkl = savepath / 'normalization_vs_gaussian_cv_fit.pkl'
 out_csv = savepath / 'normalization_vs_gaussian_cv_fit.csv'
+fit_df = fit_all(out_csv=out_csv, resume=RESUME)
 fit_df.to_pickle(out_pkl)
 fit_df.to_csv(out_csv, index=False, encoding='utf-8-sig')
 
