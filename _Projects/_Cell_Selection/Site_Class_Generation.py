@@ -21,12 +21,12 @@ save_path = r'E:\#Preprocessed_Data\SiteClass'
 
 
 #%%
-gn_folder = r'E:\#Preprocessed_Data\GoodUnits\metamer_parts'
-c_gn_path = 'GoodUnit_260605_FaLaDi_Metamer_Demolish_subset_v260508_g0_ML_MSB.mat'
+gn_folder = r'E:\#Preprocessed_Data\GoodUnits\metamer'
+c_gn_path = 'GoodUnit_260626_DiQue_Metamer_NSD_FOB_v260420_g2_ALO.mat'
 c_gn_path = ot.Join(gn_folder,c_gn_path)
 SRS = Single_Recording_Site(gn_path=c_gn_path,
-                            stimset='Metamer_Demolish_subset_v260508',
-                            brain_areas=['MSB','ML'],
+                            stimset='Metamer_NSD',
+                            brain_areas=['ALO'],
                             onset=250,
                             offset=150,
                             used_on=np.arange(160,320),
