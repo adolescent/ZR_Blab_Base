@@ -7,8 +7,8 @@ from Common_Functions.Useful_Plotter import *
 
 
 
-all_cell_path = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
-check_area = 'AL'
+all_cell_path = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Metamer_NSD_2k'
+check_area = 'ALO'
 
 
 area_dir = ot.Join(all_cell_path, check_area)
@@ -44,7 +44,7 @@ fig.tight_layout()
 plt.show()
 
 #%% ######## 平均后的Metamer打乱相应 ########
-avr = np.load(ot.Join(area_dir, 'avr_rsp.npy'))
+avr = np.load(ot.Join(area_dir, 'avr_rsp.npy'))[:,:1000]
 hm = avr.reshape(-1, 5, 200).mean(1)          # 5 cycle 平均 -> (N_cell, 200)
 z = (hm - hm.mean(1, keepdims=True)) / hm.std(1, keepdims=True)
 
@@ -57,8 +57,32 @@ ax.set_xlabel('Raw | Shuffle1 | Shuffle2 | Shuffle3 | Shuffle4')
 ax.set_ylabel(f'{check_area}  N Cell = {hm.shape[0]}')
 fig.tight_layout()
 plt.show()
+
+#%% ######## 200x200 RSA（5 cycle 平均后） ########
+# 使用上一个 cell 的 hm: (N_cell, 200)
+# 按图片交错重排: img1[Raw,S1,S2,S3,S4], img2[...], ..., img40[...]
+# 原始列顺序是 [0:40]=Raw, [40:80]=S1, [80:120]=S2, [120:160]=S3, [160:200]=S4
+order_by_img = np.array([off + i for i in range(40) for off in (0, 40, 80, 120, 160)])
+rsa_mat = np.corrcoef(z[:, order_by_img].T)  # stimulus-by-stimulus, shape (200, 200)
+
+fig, ax = plt.subplots(figsize=(6.5, 6))
+sns.heatmap(
+    rsa_mat, cmap='RdBu_r', center=0, vmin=0, vmax=1,
+    xticklabels=False, yticklabels=False, ax=ax,
+    cbar_kws={'label': 'Pearson r'},
+)
+for x in range(5, 200, 5):  # 40 张图，每张图对应 5x5 小方块
+    ax.axvline(x, color='gold', lw=0.8)
+    ax.axhline(x, color='gold', lw=0.8)
+ax.set_xlabel('Image-ordered (Raw,S1,S2,S3,S4) × 40')
+ax.set_ylabel('Image-ordered (Raw,S1,S2,S3,S4) × 40')
+ax.set_title(f'{check_area} RSA (200x200, image-ordered)')
+fig.tight_layout()
+plt.show()
+
+print('RSA matrix shape:', rsa_mat.shape)
 #%% 平均响应和raster map的统计，体现metamer的影响
-img_id = [31]              # 1-based，40 张 raw 内的编号；可改为 [1, 3, 5] 取平均
+img_id = [12]              # 1-based，40 张 raw 内的编号；可改为 [1, 3, 5] 取平均
 bin_ms = 5
 t_ms = np.arange(-100, -100 + 450)
 
@@ -91,14 +115,15 @@ import pandas as pd
 
 stim_part = 'inani'                             # 'ani': id 1-20, 'inani': id 21-40
 img_ids = np.arange(0, 20) if stim_part == 'ani' else np.arange(20, 40)
+# img_ids = np.arange(0,40)
 base_ids = np.arange(0, 20)                     # 固定用 ani 的 raw 平均做 normalization
 shuf_labels = ['Raw', 'S1', 'S2', 'S3', 'S4']
-colors = {'ML': '#2166ac', 'MSB': '#67a9cf', 'AL': '#b2182b', 'ASB': '#ef8a62'}  # M蓝 / A红
+colors = {'ALO': '#2166ac', 'MSB': '#67a9cf', 'AL': '#b2182b', 'ASB': '#ef8a62'}  # M蓝 / A红
 x = np.arange(len(shuf_labels))
 
 fig, ax = plt.subplots(figsize=(5, 4))
 all_ratio = []
-for area in ['ML', 'MSB', 'AL', 'ASB']:
+for area in [ 'ALO', 'AL', 'ASB']:
     r = np.load(ot.Join(ot.Join(all_cell_path, area), 'avr_rsp.npy')).reshape(-1, 5, 5, 40).mean(1)
     cell_mean = r[:, :, img_ids].mean(-1)
     raw_ani = r[:, 0, base_ids].mean(-1, keepdims=True)

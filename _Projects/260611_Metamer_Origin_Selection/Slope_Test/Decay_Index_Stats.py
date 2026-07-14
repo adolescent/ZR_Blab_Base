@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import OS_Tools as ot
 
-datapath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_1k = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_nsd = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Metamer_NSD_2k'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\decay_index'
 FIG_DIR = ot.Join(savepath, 'figures', 'Decay_Index_Stats')
 
@@ -17,9 +18,16 @@ N_IMG = 40
 COLOR_ANI = '#c0392b'
 COLOR_INANI = '#2980b9'
 COLOR_ALL = '#2c3e50'
-BRAIN_AREAS = ['ML', 'MSB', 'AL', 'ASB']
-AREA_ORDER = ['ASB', 'MSB', 'AL', 'ML']
-AREA_COLORS = dict(zip(AREA_ORDER, ['#c0392b', '#2980b9', '#27ae60', '#8e44ad']))
+BRAIN_AREAS = ['ML', 'MSB', 'AL', 'ASB', 'ALO']
+AREA_ORDER = ['ASB', 'MSB', 'AL', 'ML', 'ALO']
+AREA_COLORS = dict(zip(
+    AREA_ORDER,
+    ['#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#2166ac'],
+))
+area_datapath = {
+    'ML': datapath_1k, 'MSB': datapath_1k, 'AL': datapath_1k, 'ASB': datapath_1k,
+    'ALO': datapath_nsd,
+}
 
 
 
@@ -37,7 +45,7 @@ def p_to_star(p):
     return 'ns'
 
 
-def plot_violin_box(ax, data, positions, colors, violin_w=0.65, box_w=0.18, whis=BOX_WHIS):
+def plot_violin_box(ax, data, positions, colors, violin_w=0.65, box_w=0.18, whis=(10, 90)):
     """Literature-style transparent violin with narrow box overlay."""
     parts = ax.violinplot(
         data, positions=positions, widths=violin_w,
@@ -73,7 +81,9 @@ DEMO_IMG = [ 8,12, 31]   # int or list; 0-based index: 0=img1
 def load_cell_data(area):
     """Load per-image beta table and raw shuffle-level responses for one area."""
     df = pd.read_csv(ot.Join(savepath, area, 'decay_beta_by_image.csv'))
-    rsp = np.load(ot.Join(datapath, area, 'avr_rsp.npy'))
+    rsp = np.load(ot.Join(area_datapath[area], area, 'avr_rsp.npy'))
+    if rsp.shape[1] > N_REPEAT * N_SHUF * N_IMG:
+        rsp = rsp[:, :N_REPEAT * N_SHUF * N_IMG]
     rsp_hz = rsp / WINDOW_S
     r4 = rsp_hz.reshape(-1, N_REPEAT, N_SHUF, N_IMG)
     return df, r4
@@ -373,3 +383,6 @@ fig.savefig(out, dpi=150, bbox_inches='tight')
 plt.show()
 plt.close(fig)
 print(f'saved: {out}')
+
+#%%
+

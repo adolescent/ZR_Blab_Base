@@ -9,11 +9,16 @@ from scipy import stats
 from matplotlib.lines import Line2D
 import OS_Tools as ot
 
-datapath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_1k = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_nsd = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Metamer_NSD_2k'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\slope'
 
-brain_areas = ['ML', 'MSB', 'AL', 'ASB']
-plot_areas = ['ML', 'MSB', 'AL', 'ASB']
+brain_areas = ['ML', 'MSB', 'AL', 'ASB', 'ALO']
+plot_areas = ['ML', 'MSB', 'AL', 'ASB', 'ALO']
+area_datapath = {
+    'ML': datapath_1k, 'MSB': datapath_1k, 'AL': datapath_1k, 'ASB': datapath_1k,
+    'ALO': datapath_nsd,
+}
 WINDOW_S = 0.17
 N_REPEAT = 5
 N_SHUF = 5
@@ -138,8 +143,10 @@ def shift_y(y, rng):
 cache = {}
 all_dfs = []
 for area in brain_areas:
-    area_dir = ot.Join(datapath, area)
+    area_dir = ot.Join(area_datapath[area], area)
     rsp = np.load(ot.Join(area_dir, 'avr_rsp.npy'))
+    if rsp.shape[1] > N_REPEAT * N_SHUF * N_IMG:
+        rsp = rsp[:, :N_REPEAT * N_SHUF * N_IMG]
     info = pd.read_csv(ot.Join(area_dir, 'cell_site_info.csv'))
     n_cell = rsp.shape[0]
 
@@ -421,4 +428,7 @@ for area in plot_areas:
     pd.DataFrame(area_control_rows).to_csv(
         ot.Join(savepath, area, 'control_summary.csv'), index=False,
     )
+ 
+ #%%
+
  

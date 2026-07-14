@@ -12,11 +12,16 @@ except ImportError:
     tqdm = None
 
 
-datapath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_1k = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
+datapath_nsd = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Metamer_NSD_2k'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\decay_index'
 
-brain_areas = ['ML', 'MSB', 'AL', 'ASB']
-plot_areas = ['ML', 'MSB', 'AL', 'ASB']
+brain_areas = ['ML', 'MSB', 'AL', 'ASB', 'ALO']
+plot_areas = ['ML', 'MSB', 'AL', 'ASB', 'ALO']
+area_datapath = {
+    'ML': datapath_1k, 'MSB': datapath_1k, 'AL': datapath_1k, 'ASB': datapath_1k,
+    'ALO': datapath_nsd,
+}
 WINDOW_S = 0.17
 N_REPEAT = 5
 N_SHUF = 5
@@ -40,7 +45,7 @@ IMAGE_SCOPES = [
 
 # shuffle level for each of 25 points: repeat0 shuf0-4, repeat1 shuf0-4, ...
 X_SHUF = np.tile(np.arange(N_SHUF, dtype=float), N_REPEAT)
-EPS = 1e-12
+EPS = 1e-12 
 
 
 def progress_iter(iterable, desc, leave=False):
@@ -55,8 +60,10 @@ def progress_iter(iterable, desc, leave=False):
 
 def load_area_response(area):
     """Load one area's responses and return raw rsp plus 25 shuffle-level samples."""
-    area_dir = ot.Join(datapath, area)
+    area_dir = ot.Join(area_datapath[area], area)
     rsp = np.load(ot.Join(area_dir, 'avr_rsp.npy'))
+    if rsp.shape[1] > N_REPEAT * N_SHUF * N_IMG:
+        rsp = rsp[:, :N_REPEAT * N_SHUF * N_IMG]
     info = pd.read_csv(ot.Join(area_dir, 'cell_site_info.csv'))
 
     n_cell = rsp.shape[0]

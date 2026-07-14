@@ -14,7 +14,7 @@ import OS_Tools as ot
 
 datapath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
 savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Analysis\ANOVA'
-brain_areas = ['ML', 'MSB', 'AL', 'ASB']
+brain_areas = ['ML', 'MSB', 'AL', 'ASB','ALO']
 
 WINDOW_S = 0.17
 N_REPEAT = 5
