@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 LITE_VERSION = 3
-BRAIN_AREA_TOKENS = frozenset({'ML', 'MSB', 'AL', 'ASB', 'ALO', 'MF'})
+BRAIN_AREA_TOKENS = frozenset({'ML', 'MSB', 'AL', 'ASB', 'ALO', 'MF', 'V4'})
 DEFAULT_INDEX_PATH = r'E:\#Preprocessed_Data\SiteClass\Metamers\site_class_lite_index.joblib'
 INDEX_COLUMNS = (
     'path', 'folder', 'site_name', 'brain_areas', 'stimset',

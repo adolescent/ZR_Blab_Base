@@ -152,7 +152,7 @@ def main():
             "raw_bubble_start": np.int32(RAW_SLICE_BUBBLE.start),
             "raw_rest_start": np.int32(RAW_SLICE_REST.start),
         },
-        do_compression=True,
+        do_compression=True, 
     )
     print(f"masks: {masks_3200.shape} -> {mask_mat_path}")
 #%%

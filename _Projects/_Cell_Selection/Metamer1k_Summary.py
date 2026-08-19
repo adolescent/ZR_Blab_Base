@@ -2,8 +2,12 @@
 '''
 Codes for standarization operation to get metamer1k stimuli from each site class.
 
-Four brain areas (ML, MSB, AL, ASB): select cells, export averaged responses,
+Six brain areas (ML, MSB, AL, ASB, ALO, V4): select cells, export averaged responses,
 PSTH, trial-level raw data, and summary figures.
+ALO and V4 select all neurons passing noise ceiling (no FOB preference filter).
+
+Incremental export: only reprocess sites whose joblib is new or newer than the
+last export. Unchanged sites reuse saved arrays without reloading joblibs.
 '''
 
 
@@ -32,13 +36,14 @@ import warnings
 
 site_class_alasb = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
 site_class_mlmsb = r'E:\#Preprocessed_Data\SiteClass\Metamers\ML_MSB'
+site_class_alo = r'E:\#Preprocessed_Data\SiteClass\Metamers\ALO'
+site_class_v4 = r'E:\#Preprocessed_Data\SiteClass\Metamers\V4'
 
 savepath = r'E:\#Preprocessed_Data\Selected_Cells\Metamers\Raw_Metamer_1k'
 SITE_INDEX_PATH = DEFAULT_INDEX_PATH
-RUN_LITE_SCAN = False   # True: refresh index before export (run Site_Class_Lite_Scan.py instead)
-
-
+RUN_LITE_SCAN = True    # incremental index refresh (new/changed joblibs only)
 RUN_SITE_REFRESH = False  # set True to run once, then set back to False
+RUN_FOB_EXPORT = True
 select_mod = 'Metamer_1k'
 N_IMG = 1000
 N_TIME = 450
@@ -52,11 +57,15 @@ N_TIME_BIN = N_TIME // TRIAL_BIN_MS   # 450 -> 90
 FOB_LENGTHS = {'STI150': 150, 'Wordloc': 180, 'FOB72': 72}
 N_FOB_MAX = 150
 FOB_TIME_SLICE = slice(160, 320)   # same window as Stim_Cell_Rearrange
-BRAIN_AREAS = ['ML', 'MSB', 'AL', 'ASB']
-AREA_PREFER = {'ML': 'Face', 'AL': 'Face', 'MSB': 'Body', 'ASB': 'Body'}
+BRAIN_AREAS = ['ML', 'MSB', 'AL', 'ASB', 'ALO', 'V4']
+AREA_PREFER = {
+    'ML': 'Face', 'AL': 'Face', 'MSB': 'Body', 'ASB': 'Body',
+    'ALO': 'all', 'V4': 'all',
+}
 AREA_FOLDER = {
     'ML': site_class_mlmsb, 'MSB': site_class_mlmsb,
     'AL': site_class_alasb, 'ASB': site_class_alasb,
+    'ALO': site_class_alo, 'V4': site_class_v4,
 }
 
 
@@ -68,6 +77,7 @@ _SUBJ_CANON = {
     'facai': 'FC', 'fc': 'FC',
     'zhuangzhuang': 'ZZ', 'zz': 'ZZ',
     'fld': 'FLD', 'faladi': 'FLD',
+    'dique': 'DQ', 'dq': 'DQ',
 }
 
 
@@ -117,6 +127,149 @@ def refresh_site_metrics(SRS):
     return SRS
 
 
+def select_cells(SRS, prefer, ceiling=CEILING_THRES, dp_thres=DP_THRES):
+    """Select cells; prefer may be a single category or a tuple (union)."""
+    if isinstance(prefer, (list, tuple)):
+        parts = []
+        for p in prefer:
+            s, _ = SRS.Cell_Selection(ceiling=ceiling, prefer=p, dp_thres=dp_thres)
+            if len(s):
+                parts.append(s)
+        if not parts:
+            return np.array([], dtype=int)
+        return np.unique(np.concatenate(parts))
+    selected, _ = SRS.Cell_Selection(ceiling=ceiling, prefer=prefer, dp_thres=dp_thres)
+    return selected
+
+
+def site_mtime(path):
+    return os.path.getmtime(path)
+
+
+def entry_needs_refresh(path, entry, export_mtime=None):
+    try:
+        file_mtime = site_mtime(path)
+    except OSError:
+        return True
+    saved_mtime = entry.get('mtime')
+    if saved_mtime is not None:
+        return saved_mtime != file_mtime
+    # legacy manifest without mtime: only reload if joblib is newer than last export
+    if export_mtime is not None:
+        return file_mtime > export_mtime
+    return False
+
+
+def classify_site_changes(current_sites, saved_manifest, export_mtime=None):
+    """Return new, changed, removed paths and a lookup for unchanged entries."""
+    saved_by_path = {e['path']: e for e in (saved_manifest or [])}
+    current_set = set(current_sites)
+
+    new_sites = [p for p in current_sites if p not in saved_by_path]
+    removed_sites = [p for p in saved_by_path if p not in current_set]
+    changed_sites, unchanged_entries = [], {}
+    for p in current_sites:
+        if p not in saved_by_path:
+            continue
+        entry = saved_by_path[p]
+        if entry_needs_refresh(p, entry, export_mtime=export_mtime):
+            changed_sites.append(p)
+        else:
+            unchanged_entries[p] = entry
+
+    return new_sites, changed_sites, removed_sites, unchanged_entries
+
+
+def load_existing_area_export(out_dir):
+    manifest_path = ot.Join(out_dir, 'site_manifest.joblib')
+    if not os.path.exists(manifest_path):
+        return None, None, None, None, None
+
+    manifest = JL.load(manifest_path)
+    avr_path = ot.Join(out_dir, 'avr_rsp.npy')
+    psth_path = ot.Join(out_dir, 'psth.npy')
+    trials_path = ot.Join(out_dir, 'trials_raw.npy')
+    if not (os.path.exists(avr_path) and os.path.exists(psth_path)):
+        return manifest, None, None, None, None
+
+    prev_n_repeat = None
+    meta_path = ot.Join(out_dir, 'trials_raw_meta.npz')
+    info_jl = ot.Join(out_dir, 'cell_site_info.joblib')
+    if os.path.exists(meta_path):
+        meta = np.load(meta_path)
+        prev_n_repeat = min(MAX_REPEAT, int(np.max(meta['n_repeat_valid'])))
+    elif os.path.exists(info_jl):
+        prev_n_repeat = min(MAX_REPEAT, int(JL.load(info_jl)['n_repeat'].max()))
+
+    return (
+        manifest,
+        np.load(avr_path),
+        np.load(psth_path),
+        trials_path if os.path.exists(trials_path) else None,
+        prev_n_repeat,
+    )
+
+
+def process_single_site(c_site, prefer, stim_infos):
+    """Load one site joblib and return arrays + metadata, or None if no cells."""
+    try:
+        SRS = JL.load(c_site)
+    except Exception as e:
+        print(f'Load failed {c_site}: {e}')
+        return None
+
+    data_ids = np.asarray(stim_infos[SRS.stimset]['Data'])
+    if len(data_ids) != N_IMG:
+        print(f'Warning {SRS.site_name}: expected {N_IMG} ids, got {len(data_ids)}')
+
+    selected = select_cells(SRS, prefer)
+    if len(selected) == 0:
+        del SRS
+        return None
+
+    raw = SRS.raw_psth[selected][:, :, data_ids, :]
+    n_cell, n_repeat, _, _ = raw.shape
+
+    chunk = {
+        'path': c_site,
+        'mtime': site_mtime(c_site),
+        'selected': selected.copy(),
+        'data_ids': data_ids,
+        'n_cell': n_cell,
+        'n_repeat': n_repeat,
+        'avr': raw[:, :, :, TIME_SLICE].sum(-1).mean(1).astype(np.float32),
+        'psth': raw.mean(1).astype(np.float32),
+        'info_rows': _info_rows_for_site(SRS, selected, n_repeat),
+    }
+    del SRS, raw
+    gc.collect()
+    return chunk
+
+
+def _info_rows_for_site(SRS, selected, n_repeat):
+    date, subject = parse_site_meta(SRS.site_name)
+    dp_face, dp_body = cell_dp_lookup(SRS, selected)
+    ceiling = SRS.ceiling_index[selected]
+    rows = []
+    for local_i in range(len(selected)):
+        rows.append({
+            'site_name': SRS.site_name,
+            'date': date,
+            'subject': subject,
+            'local_cell_idx': int(selected[local_i]),
+            'stimset': SRS.stimset,
+            'dprime_face': float(dp_face[local_i]),
+            'dprime_body': float(dp_body[local_i]),
+            'ceiling_index': float(ceiling[local_i]),
+            'n_repeat': int(n_repeat),
+        })
+    return rows
+
+
+def _prefer_label(prefer):
+    return '+'.join(prefer) if isinstance(prefer, (list, tuple)) else prefer
+
+
 def match_area(SRS, area):
     areas = getattr(SRS, 'brain_areas', [])
     if area == 'ML':
@@ -152,10 +305,27 @@ def bin_trials_psth(raw, bin_ms=TRIAL_BIN_MS):
             .sum(-1, dtype=np.float32))
 
 
-def fill_trials_memmap(site_chunks, n_cell_total, n_repeat_max, out_dir):
-    """Second pass: stream each site into memmap (low RAM peak)."""
+def fill_trials_memmap(site_chunks, n_cell_total, n_repeat_max, out_dir, area_label='',
+                       prev_trials_path=None, reuse_paths=None, prev_n_cell=None, prev_n_repeat=None):
+    """Stream each site into memmap; reuse prior trials for unchanged sites."""
+    reuse_paths = set(reuse_paths or [])
     trials_path = ot.Join(out_dir, 'trials_raw.npy')
     binned_buf = ot.Join(out_dir, '_trials_binned5ms_buf.npy')
+    prev_backup = ot.Join(out_dir, '_trials_raw_prev.npy')
+
+    prev_mm = None
+    if prev_trials_path and os.path.exists(prev_trials_path) and reuse_paths and prev_n_cell and prev_n_repeat:
+        # Do not open w+ on the same npy we still need to read.
+        if os.path.normpath(prev_trials_path) == os.path.normpath(trials_path):
+            if os.path.exists(prev_backup):
+                os.remove(prev_backup)
+            os.replace(prev_trials_path, prev_backup)
+            prev_trials_path = prev_backup
+        prev_mm = np.memmap(
+            prev_trials_path, dtype=np.float32, mode='r',
+            shape=(prev_n_cell, prev_n_repeat, N_IMG, N_TIME),
+        )
+
     trials_mm = np.memmap(
         trials_path, dtype=np.float32, mode='w+',
         shape=(n_cell_total, n_repeat_max, N_IMG, N_TIME),
@@ -166,22 +336,34 @@ def fill_trials_memmap(site_chunks, n_cell_total, n_repeat_max, out_dir):
     )
     trials_rsp = np.full((n_cell_total, n_repeat_max, N_IMG), np.nan, dtype=np.float32)
 
-    for chunk in tqdm(site_chunks, desc=f'{cloc} write trials'):
-        SRS = JL.load(chunk['path'])
-        raw = SRS.raw_psth[chunk['selected']][:, :, chunk['data_ids'], :].astype(np.float32)
+    for chunk in tqdm(site_chunks, desc=f'{area_label} write trials'):
         off, n_c = chunk['offset'], chunk['n_cell']
         n_r = min(chunk['n_repeat'], n_repeat_max)
 
-        trials_mm[off:off + n_c, :n_r] = raw[:, :n_r]
-        trials_bin_mm[off:off + n_c, :n_r] = bin_trials_psth(raw[:, :n_r])
-        trials_rsp[off:off + n_c, :n_r] = raw[:, :n_r, :, TIME_SLICE].sum(-1)
+        if chunk['path'] in reuse_paths and prev_mm is not None and 'prev_offset' in chunk:
+            old_off = int(chunk['prev_offset'])
+            n_r_copy = min(n_r, prev_n_repeat)
+            trials_mm[off:off + n_c, :n_r_copy] = prev_mm[old_off:old_off + n_c, :n_r_copy]
+        else:
+            SRS = JL.load(chunk['path'])
+            raw = SRS.raw_psth[chunk['selected']][:, :, chunk['data_ids'], :].astype(np.float32)
+            trials_mm[off:off + n_c, :n_r] = raw[:, :n_r]
+            del SRS, raw
+
+        trials_bin_mm[off:off + n_c, :n_r] = bin_trials_psth(trials_mm[off:off + n_c, :n_r])
+        trials_rsp[off:off + n_c, :n_r] = trials_mm[off:off + n_c, :n_r, :, TIME_SLICE].sum(-1)
         if n_r < n_repeat_max:
             trials_mm[off:off + n_c, n_r:] = np.nan
             trials_bin_mm[off:off + n_c, n_r:] = np.nan
             trials_rsp[off:off + n_c, n_r:] = np.nan
 
-        del SRS, raw
-        gc.collect()
+        if chunk['path'] not in reuse_paths:
+            gc.collect()
+
+    if prev_mm is not None:
+        del prev_mm
+    if os.path.exists(prev_backup):
+        os.remove(prev_backup)
 
     trials_mm.flush()
     trials_bin_mm.flush()
@@ -324,6 +506,7 @@ def build_site_manifest(site_chunks, info_df):
         row = info_df.iloc[chunk['offset']]
         manifest.append({
             'path': chunk['path'],
+            'mtime': chunk.get('mtime', site_mtime(chunk['path'])),
             'selected': chunk['selected'],
             'stimset': row['stimset'],
             'site_name': row['site_name'],
@@ -332,6 +515,286 @@ def build_site_manifest(site_chunks, info_df):
             'n_repeat': chunk['n_repeat'],
         })
     return manifest
+
+
+def export_brain_area_incremental(cloc, sites, prefer, stim_infos, save_root=savepath):
+    """
+    Incrementally export one brain area.
+    Reuses saved arrays for unchanged sites; only reloads new/changed joblibs.
+    Returns True if data was written, False if skipped (no changes).
+    """
+    out_dir = ot.Join(save_root, cloc)
+    saved_manifest, existing_avr, existing_psth, prev_trials_path, prev_n_repeat = load_existing_area_export(out_dir)
+    avr_mtime = None
+    avr_path = ot.Join(out_dir, 'avr_rsp.npy')
+    if os.path.exists(avr_path):
+        avr_mtime = os.path.getmtime(avr_path)
+    new_sites, changed_sites, removed_sites, unchanged_entries = classify_site_changes(
+        sites, saved_manifest, export_mtime=avr_mtime,
+    )
+
+    if saved_manifest and not new_sites and not changed_sites and not removed_sites:
+        print(f'{cloc}: no site changes, skip export.')
+        return False
+
+    if new_sites or changed_sites or removed_sites:
+        print(
+            f'{cloc}: incremental update — '
+            f'new={len(new_sites)}, changed={len(changed_sites)}, removed={len(removed_sites)}, '
+            f'unchanged={len(unchanged_entries)}',
+        )
+    else:
+        print(f'{cloc}: full export ({len(sites)} sites)')
+
+    old_info = None
+    info_jl = ot.Join(out_dir, 'cell_site_info.joblib')
+    if os.path.exists(info_jl):
+        old_info = JL.load(info_jl)
+    elif os.path.exists(ot.Join(out_dir, 'cell_site_info.csv')):
+        old_info = pd.read_csv(ot.Join(out_dir, 'cell_site_info.csv'))
+
+    avr_list, psth_list, site_chunks = [], [], []
+    info_rows = []
+    n_repeat_valid_all = []
+    n_repeat_max = 0
+    global_idx = 0
+    reuse_paths = set()
+    to_process = set(new_sites) | set(changed_sites)
+
+    for c_site in tqdm(sites, total=len(sites), desc=cloc):
+        can_reuse = (
+            c_site in unchanged_entries
+            and existing_avr is not None
+            and existing_psth is not None
+            and old_info is not None
+        )
+        if can_reuse:
+            entry = unchanged_entries[c_site]
+            off_old = int(entry['offset'])
+            n_cell = int(entry['n_cell'])
+            n_repeat = int(entry['n_repeat'])
+            if off_old + n_cell > len(existing_avr) or off_old + n_cell > len(old_info):
+                can_reuse = False
+            else:
+                n_repeat_max = max(n_repeat_max, n_repeat)
+                avr_list.append(existing_avr[off_old:off_old + n_cell])
+                psth_list.append(existing_psth[off_old:off_old + n_cell])
+                site_chunks.append({
+                    'path': c_site,
+                    'mtime': entry.get('mtime', site_mtime(c_site)),
+                    'selected': entry['selected'],
+                    'data_ids': None,
+                    'offset': global_idx,
+                    'prev_offset': off_old,
+                    'n_cell': n_cell,
+                    'n_repeat': n_repeat,
+                })
+                reuse_paths.add(c_site)
+
+                sub = old_info.iloc[off_old:off_old + n_cell].copy()
+                sub['global_idx'] = np.arange(global_idx, global_idx + n_cell)
+                info_rows.extend(sub.to_dict('records'))
+                n_repeat_valid_all.extend(sub['n_repeat'].tolist())
+                global_idx += n_cell
+                continue
+
+        if c_site not in to_process and c_site not in unchanged_entries:
+            continue
+
+        chunk = process_single_site(c_site, prefer, stim_infos)
+        if chunk is None:
+            continue
+
+        n_cell = chunk['n_cell']
+        n_repeat = chunk['n_repeat']
+        n_repeat_max = max(n_repeat_max, n_repeat)
+
+        avr_list.append(chunk['avr'])
+        psth_list.append(chunk['psth'])
+        site_chunks.append({
+            'path': chunk['path'],
+            'mtime': chunk['mtime'],
+            'selected': chunk['selected'],
+            'data_ids': chunk['data_ids'],
+            'offset': global_idx,
+            'n_cell': n_cell,
+            'n_repeat': n_repeat,
+        })
+        n_repeat_valid_all.extend([n_repeat] * n_cell)
+
+        for i, row in enumerate(chunk['info_rows']):
+            row = dict(row)
+            row['global_idx'] = global_idx + i
+            info_rows.append(row)
+
+        global_idx += n_cell
+        del chunk
+        gc.collect()
+
+    if not avr_list:
+        print(f'{cloc}: no cells selected, skip.')
+        return False
+
+    avr_rsp = np.vstack(avr_list)
+    psth = np.vstack(psth_list)
+    n_repeat_max = min(MAX_REPEAT, n_repeat_max)
+    n_cell_total = avr_rsp.shape[0]
+    n_repeat_arr = np.array(n_repeat_valid_all, dtype=np.int16)
+
+    info_df = pd.DataFrame(info_rows)
+    ot.Mkdir(out_dir)
+
+    prev_n_cell = len(old_info) if old_info is not None else None
+    trials_rsp, binned_buf = fill_trials_memmap(
+        site_chunks, n_cell_total, n_repeat_max, out_dir, area_label=cloc,
+        prev_trials_path=prev_trials_path, reuse_paths=reuse_paths,
+        prev_n_cell=prev_n_cell, prev_n_repeat=prev_n_repeat,
+    )
+
+    np.save(ot.Join(out_dir, 'avr_rsp.npy'), avr_rsp)
+    np.save(ot.Join(out_dir, 'psth.npy'), psth)
+    info_df.to_csv(ot.Join(out_dir, 'cell_site_info.csv'), index=False)
+    JL.dump(info_df, ot.Join(out_dir, 'cell_site_info.joblib'), compress=3)
+
+    prefer_label = _prefer_label(prefer)
+    np.savez_compressed(
+        ot.Join(out_dir, 'trials_raw_meta.npz'),
+        n_repeat_valid=n_repeat_arr,
+        brain_area=cloc,
+        prefer=prefer_label,
+        bin_ms=TRIAL_BIN_MS,
+    )
+    trials_binned = np.memmap(
+        binned_buf, dtype=np.float32, mode='r',
+        shape=(n_cell_total, n_repeat_max, N_IMG, N_TIME_BIN),
+    )
+    np.savez(
+        ot.Join(out_dir, 'trials_raw_binned5ms.npz'),
+        trials=trials_binned,
+        n_repeat_valid=n_repeat_arr,
+        brain_area=np.array(cloc),
+        prefer=np.array(prefer_label),
+        bin_ms=np.int16(TRIAL_BIN_MS),
+    )
+    del trials_binned
+    if os.path.exists(binned_buf):
+        os.remove(binned_buf)
+
+    np.savez_compressed(
+        ot.Join(out_dir, 'trials_rsp.npz'),
+        trials_rsp=trials_rsp,
+        n_repeat_valid=n_repeat_arr,
+        brain_area=cloc,
+        prefer=prefer_label,
+    )
+
+    plot_heatmap(avr_rsp, ot.Join(out_dir, 'heatmap_1k.png'))
+    plot_raster_first40(psth, ot.Join(out_dir, 'raster_first40.png'))
+
+    site_manifest = build_site_manifest(site_chunks, info_df)
+    JL.dump(site_manifest, ot.Join(out_dir, 'site_manifest.joblib'), compress=3)
+
+    if RUN_FOB_EXPORT:
+        export_fob_incremental(
+            cloc, site_chunks, info_df, reuse_paths, stim_infos, save_root,
+        )
+
+    del trials_rsp, avr_rsp, psth, site_chunks, site_manifest
+    gc.collect()
+
+    print(f'{cloc}: saved {n_cell_total} cells -> {out_dir}')
+    return True
+
+
+def export_fob_incremental(cloc, site_chunks, info_df, reuse_paths, stim_infos, save_root=savepath):
+    """FOB pass: copy unchanged sites from previous FOB arrays, reload only new/changed."""
+    out_dir = ot.Join(save_root, cloc)
+    n_cell_total = len(info_df)
+    n_repeat_max = min(MAX_REPEAT, int(info_df['n_repeat'].max()))
+    reuse_paths = set(reuse_paths or [])
+
+    old_trial = old_avr = old_len = old_style = None
+    old_n_repeat = None
+    fob_trial_path = ot.Join(out_dir, 'fob_by_trial.npz')
+    fob_avr_path = ot.Join(out_dir, 'fob_avr.npy')
+    fob_meta_path = ot.Join(out_dir, 'fob_meta.npz')
+    if reuse_paths and os.path.exists(fob_trial_path) and os.path.exists(fob_avr_path):
+        old = np.load(fob_trial_path, allow_pickle=True)
+        old_trial = old['fob_by_trial']
+        old_n_repeat = old_trial.shape[1]
+        old_avr = np.load(fob_avr_path)
+        if os.path.exists(fob_meta_path):
+            old_meta = np.load(fob_meta_path, allow_pickle=True)
+            old_len = old_meta['fob_valid_len']
+            old_style = old_meta['fob_style']
+
+    fob_by_trial = np.full(
+        (n_cell_total, n_repeat_max, N_FOB_MAX), np.nan, dtype=np.float32,
+    )
+    fob_avr = np.full((n_cell_total, N_FOB_MAX), np.nan, dtype=np.float32)
+    fob_valid_len = np.zeros(n_cell_total, dtype=np.int16)
+    fob_style_arr = np.empty(n_cell_total, dtype=object)
+
+    for entry in tqdm(site_chunks, desc=f'{cloc} FOB'):
+        off, n_c = entry['offset'], entry['n_cell']
+        n_r = min(entry['n_repeat'], n_repeat_max)
+        reused = (
+            entry['path'] in reuse_paths
+            and old_trial is not None
+            and old_avr is not None
+            and 'prev_offset' in entry
+        )
+        if reused:
+            old_off = int(entry['prev_offset'])
+            n_r_copy = min(n_r, old_n_repeat)
+            fob_by_trial[off:off + n_c, :n_r_copy] = old_trial[old_off:old_off + n_c, :n_r_copy]
+            fob_avr[off:off + n_c] = old_avr[old_off:old_off + n_c]
+            if old_len is not None:
+                fob_valid_len[off:off + n_c] = old_len[old_off:old_off + n_c]
+            if old_style is not None:
+                fob_style_arr[off:off + n_c] = old_style[old_off:old_off + n_c]
+            continue
+
+        SRS = JL.load(entry['path'])
+        stimset = info_df.iloc[off]['stimset']
+        selected = entry['selected']
+        fob_info = stim_infos[stimset]['FOB']
+        fob_style = fob_info['style']
+        fob_ids = fob_info['id']
+
+        raw = SRS.raw_psth[selected]
+        avr_p = SRS.avr_psth[selected]
+        fob_tri = extract_fob_by_trial(raw, fob_ids, fob_style)
+        fob_mean = extract_fob_avr(avr_p, fob_ids, fob_style)
+        fob_tri_pad, n_valid = pad_fob_axis(fob_tri)
+        fob_mean_pad, _ = pad_fob_axis(fob_mean)
+
+        fob_by_trial[off:off + n_c, :n_r] = fob_tri_pad[:, :n_r]
+        fob_avr[off:off + n_c] = fob_mean_pad
+        fob_valid_len[off:off + n_c] = n_valid
+        fob_style_arr[off:off + n_c] = fob_style
+
+        del SRS, raw, avr_p, fob_tri, fob_mean, fob_tri_pad, fob_mean_pad
+        gc.collect()
+
+    np.savez_compressed(
+        ot.Join(out_dir, 'fob_by_trial.npz'),
+        fob_by_trial=fob_by_trial,
+        n_repeat_valid=info_df['n_repeat'].to_numpy(dtype=np.int16),
+        n_fob_max=np.int16(N_FOB_MAX),
+        brain_area=cloc,
+    )
+    np.save(ot.Join(out_dir, 'fob_avr.npy'), fob_avr)
+    np.savez_compressed(
+        ot.Join(out_dir, 'fob_meta.npz'),
+        fob_valid_len=fob_valid_len,
+        fob_style=fob_style_arr,
+        n_fob_max=np.int16(N_FOB_MAX),
+        brain_area=cloc,
+    )
+    plot_fob_heatmap(fob_avr, fob_valid_len, ot.Join(out_dir, 'heatmap_fob.png'))
+    print(f'{cloc}: FOB saved {n_cell_total} cells -> {out_dir}')
+    return fob_by_trial, fob_avr
 
 
 def export_fob_for_area(cloc, save_root=savepath, stim_infos=None):
@@ -411,11 +874,18 @@ def export_fob_for_area(cloc, save_root=savepath, stim_infos=None):
 
 #%% site-class lite index (skip irrelevant joblibs without full load)
 
-_SITE_ROOTS = {'ML_MSB': site_class_mlmsb, 'AL_ASB': site_class_alasb}
+_SITE_ROOTS = {
+    'ML_MSB': site_class_mlmsb,
+    'AL_ASB': site_class_alasb,
+    'ALO': site_class_alo,
+    'V4': site_class_v4,
+}
 if RUN_LITE_SCAN or not os.path.exists(SITE_INDEX_PATH):
     site_index = refresh_site_class_index(_SITE_ROOTS, SITE_INDEX_PATH, show_progress=True)
 else:
-    site_index = load_site_class_index(SITE_INDEX_PATH)
+    site_index = refresh_site_class_index(_SITE_ROOTS, SITE_INDEX_PATH, show_progress=False)
+
+print(f'site_class_lite v{LITE_VERSION}, columns={list(site_index.columns)}')
 
 
 #%% =============================================================================
@@ -444,9 +914,10 @@ if RUN_SITE_REFRESH:
     print('Site-class refresh done.')
 
 
-#%% export four brain areas
+#%% export brain areas (incremental)
 
 stim_infos = Select_Cell_Info(select_mod)
+areas_updated = []
 
 for cloc in BRAIN_AREAS:
     data_path = AREA_FOLDER[cloc]
@@ -456,148 +927,9 @@ for cloc in BRAIN_AREAS:
         print(f'{cloc}: no matching sites in lite index, skip.')
         continue
     print(f'{cloc}: {len(sites)} sites match {select_mod}')
+    if export_brain_area_incremental(cloc, sites, prefer, stim_infos, savepath):
+        areas_updated.append(cloc)
 
-    avr_list, psth_list, site_chunks = [], [], []
-    info_rows = []
-    n_repeat_valid_all = []
-    n_repeat_max = 0
-    global_idx = 0
-
-    for c_site in tqdm(sites, total=len(sites), desc=cloc):
-        try:
-            SRS = JL.load(c_site)
-        except Exception as e:
-            print(f'Load failed {c_site}: {e}')
-            continue
-
-        data_ids = np.asarray(stim_infos[SRS.stimset]['Data'])
-        if len(data_ids) != N_IMG:
-            print(f'Warning {SRS.site_name}: expected {N_IMG} ids, got {len(data_ids)}')
-
-        selected, _ = SRS.Cell_Selection(
-            ceiling=CEILING_THRES, prefer=prefer, dp_thres=DP_THRES,
-        )
-        if len(selected) == 0:
-            del SRS
-            continue
-
-        raw = SRS.raw_psth[selected][:, :, data_ids, :]  # (n, n_repeat, 1000, 450)
-        n_cell, n_repeat, _, _ = raw.shape
-        n_repeat_max = max(n_repeat_max, n_repeat)
-
-        c_avr = raw[:, :, :, TIME_SLICE].sum(-1).mean(1).astype(np.float32)
-        c_psth = raw.mean(1).astype(np.float32)
-
-        avr_list.append(c_avr)
-        psth_list.append(c_psth)
-        site_chunks.append({
-            'path': c_site,
-            'selected': selected.copy(),
-            'data_ids': data_ids,
-            'offset': global_idx,
-            'n_cell': n_cell,
-            'n_repeat': n_repeat,
-        })
-        n_repeat_valid_all.extend([n_repeat] * n_cell)
-
-        date, subject = parse_site_meta(SRS.site_name)
-        dp_face, dp_body = cell_dp_lookup(SRS, selected)
-        ceiling = SRS.ceiling_index[selected]
-        for local_i in range(n_cell):
-            info_rows.append({
-                'global_idx': global_idx + local_i,
-                'site_name': SRS.site_name,
-                'date': date,
-                'subject': subject,
-                'local_cell_idx': int(selected[local_i]),
-                'stimset': SRS.stimset,
-                'dprime_face': float(dp_face[local_i]),
-                'dprime_body': float(dp_body[local_i]),
-                'ceiling_index': float(ceiling[local_i]),
-                'n_repeat': int(n_repeat),
-            })
-        global_idx += n_cell
-        del SRS, raw
-        gc.collect()
-
-    if not avr_list:
-        print(f'{cloc}: no cells selected, skip.')
-        continue
-
-    avr_rsp = np.vstack(avr_list)
-    psth = np.vstack(psth_list)
-    n_repeat_max = min(MAX_REPEAT, n_repeat_max)
-    n_cell_total = avr_rsp.shape[0]
-    n_repeat_arr = np.array(n_repeat_valid_all, dtype=np.int16)
-
-    info_df = pd.DataFrame(info_rows)
-    out_dir = ot.Join(savepath, cloc)
-    ot.Mkdir(out_dir)
-
-    trials_rsp, binned_buf = fill_trials_memmap(
-        site_chunks, n_cell_total, n_repeat_max, out_dir,
-    )
-
-    np.save(ot.Join(out_dir, 'avr_rsp.npy'), avr_rsp)
-    np.save(ot.Join(out_dir, 'psth.npy'), psth)
-    info_df.to_csv(ot.Join(out_dir, 'cell_site_info.csv'), index=False)
-    JL.dump(info_df, ot.Join(out_dir, 'cell_site_info.joblib'), compress=3)
-
-    np.savez_compressed(
-        ot.Join(out_dir, 'trials_raw_meta.npz'),
-        n_repeat_valid=n_repeat_arr,
-        brain_area=cloc,
-        prefer=prefer,
-        bin_ms=TRIAL_BIN_MS,
-    )
-    trials_binned = np.memmap(
-        binned_buf, dtype=np.float32, mode='r',
-        shape=(n_cell_total, n_repeat_max, N_IMG, N_TIME_BIN),
-    )
-    np.savez(
-        ot.Join(out_dir, 'trials_raw_binned5ms.npz'),
-        trials=trials_binned,
-        n_repeat_valid=n_repeat_arr,
-        brain_area=np.array(cloc),
-        prefer=np.array(prefer),
-        bin_ms=np.int16(TRIAL_BIN_MS),
-    )
-    del trials_binned
-    if os.path.exists(binned_buf):
-        os.remove(binned_buf)
-
-    np.savez_compressed(
-        ot.Join(out_dir, 'trials_rsp.npz'),
-        trials_rsp=trials_rsp,
-        n_repeat_valid=n_repeat_arr,
-        brain_area=cloc,
-        prefer=prefer,
-    )
-
-    plot_heatmap(avr_rsp, ot.Join(out_dir, 'heatmap_1k.png'))
-    plot_raster_first40(psth, ot.Join(out_dir, 'raster_first40.png'))
-
-    site_manifest = build_site_manifest(site_chunks, info_df)
-    JL.dump(site_manifest, ot.Join(out_dir, 'site_manifest.joblib'), compress=3)
-
-    del trials_rsp, avr_rsp, psth, site_chunks, site_manifest
-    gc.collect()
-
-    print(f'{cloc}: saved {n_cell_total} cells -> {out_dir}')
-
-
-#%% FOB export (standalone — reads savepath/<area>/site_manifest.joblib)
-# Run after main export, or independently on an existing savepath folder.
-
-RUN_FOB_EXPORT = True
-
-if RUN_FOB_EXPORT:
-    _stim_infos_fob = Select_Cell_Info('Metamer_1k')
-    for _cloc in BRAIN_AREAS:
-        try:
-            export_fob_for_area(_cloc, savepath, _stim_infos_fob)
-        except FileNotFoundError as _e:
-            print(f'{_cloc} FOB skip: {_e}')
-        except Exception as _e:
-            print(f'{_cloc} FOB failed: {_e}')
+if not areas_updated:
+    print('No area updates this run (FOB already written during export if needed).')
 

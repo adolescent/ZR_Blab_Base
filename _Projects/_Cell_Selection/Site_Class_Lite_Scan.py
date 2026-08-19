@@ -22,8 +22,7 @@ from Py_Structure.Site_Class_Lite import (
 site_class_mlmsb = r'E:\#Preprocessed_Data\SiteClass\Metamers\ML_MSB'
 site_class_alasb = r'E:\#Preprocessed_Data\SiteClass\Metamers\AL_ASB'
 site_class_alo = r'E:\#Preprocessed_Data\SiteClass\Metamers\ALO'
-
-site_class_alo = r'E:\#Preprocessed_Data\SiteClass\Metamers\ALO'
+site_class_v4 = r'E:\#Preprocessed_Data\SiteClass\Metamers\V4'
 
 INDEX_PATH = DEFAULT_INDEX_PATH
 
@@ -31,6 +30,7 @@ SITE_ROOTS = {
     'ML_MSB': site_class_mlmsb,
     'AL_ASB': site_class_alasb,
     'ALO': site_class_alo,
+    'V4': site_class_v4,
 }
 
 

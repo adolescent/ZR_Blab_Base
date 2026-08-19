@@ -21,12 +21,12 @@ save_path = r'E:\#Preprocessed_Data\SiteClass'
 
 
 #%%
-gn_folder = r'E:\#Preprocessed_Data\GoodUnits\metamer'
-c_gn_path = 'GoodUnit_260626_DiQue_Metamer_NSD_FOB_v260420_g2_ALO.mat'
+gn_folder = r'E:\#Preprocessed_Data\GoodUnits\anagram_jigsaw'
+c_gn_path = 'GoodUnit_260708_Faladi_Anagram_Jigsaw_v260227_g4_V4.mat'
 c_gn_path = ot.Join(gn_folder,c_gn_path)
 SRS = Single_Recording_Site(gn_path=c_gn_path,
-                            stimset='Metamer_NSD',
-                            brain_areas=['ALO'],
+                            stimset='Anagram_Jigsaw_v260227',
+                            brain_areas=['V4'],
                             onset=250,
                             offset=150,
                             used_on=np.arange(160,320),
@@ -64,6 +64,8 @@ fig = Triangle_FOB(pivot_dp,1,800,600,label=False)
 fig.write_html(ot.Join(save_path,f'{SRS.site_name}_{'_'.join(SRS.brain_areas)}_{SRS.stimset}.html'))
 
 #%% test fob
+
+
 a = SRS.raw_redplot
 sns.heatmap(a/a.max(1,keepdims=1),cmap='bwr',vmax=1,center=0)
 
